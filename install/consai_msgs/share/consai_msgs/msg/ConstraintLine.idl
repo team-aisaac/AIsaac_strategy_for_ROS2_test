@@ -1,0 +1,35 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from consai_msgs/msg/ConstraintLine.msg
+// generated code does not contain a copyright notice
+
+#include "consai_msgs/msg/ConstraintTheta.idl"
+#include "consai_msgs/msg/ConstraintXY.idl"
+
+module consai_msgs {
+  module msg {
+    @verbatim (language="comment", text=
+      " 直線による拘束")
+    struct ConstraintLine {
+      @verbatim (language="comment", text=
+        " P1とP2を結ぶ直線Line1to2を作る")
+      consai_msgs::msg::ConstraintXY p1;
+
+      consai_msgs::msg::ConstraintXY p2;
+
+      @verbatim (language="comment", text=
+        " Line1の直線上で、P1からdistanceだけ離れた位置を目標位置とする")
+      double distance;
+
+      @verbatim (language="comment", text=
+        " 姿勢theta")
+      consai_msgs::msg::ConstraintTheta theta;
+
+      @verbatim (language="comment", text=
+        " P3とP4をセットした場合、P3とP4を結ぶ直線Line3to4を作り" "\n"
+        " Line1to2上で、Line3to4と交わるところを目標位置とする")
+      sequence<consai_msgs::msg::ConstraintXY, 1> p3;
+
+      sequence<consai_msgs::msg::ConstraintXY, 1> p4;
+    };
+  };
+};

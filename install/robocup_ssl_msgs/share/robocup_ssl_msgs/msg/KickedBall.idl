@@ -1,0 +1,49 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from robocup_ssl_msgs/msg/detection_tracked/KickedBall.msg
+// generated code does not contain a copyright notice
+
+#include "robocup_ssl_msgs/msg/RobotId.idl"
+#include "robocup_ssl_msgs/msg/Vector2.idl"
+#include "robocup_ssl_msgs/msg/Vector3.idl"
+
+module robocup_ssl_msgs {
+  module msg {
+    @verbatim (language="comment", text=
+      " This msg file is a copy of 'messages_robocup_ssl_detection_tracked.proto'" "\n"
+      " https://github.com/RoboCup-SSL/ssl-vision/blob/master/src/shared/proto/messages_robocup_ssl_detection_tracked.proto")
+    struct KickedBall {
+      @verbatim (language="comment", text=
+        " A ball kicked by a robot, including predictions when the ball will come to a stop" "\n"
+        " The initial position from which the ball was kicked")
+      @unit (value="m")
+      robocup_ssl_msgs::msg::Vector2 pos;
+
+      @verbatim (language="comment", text=
+        " The initial velocity with which the ball was kicked")
+      @unit (value="m/s")
+      robocup_ssl_msgs::msg::Vector3 vel;
+
+      @verbatim (language="comment", text=
+        " The unix timestamp when the kick was performed")
+      @unit (value="s")
+      double start_timestamp;
+
+      @verbatim (language="comment", text=
+        " The predicted unix timestamp when the ball comes to a stop" "\n"
+        " optional")
+      @unit (value="s")
+      sequence<double, 1> stop_timestamp;
+
+      @verbatim (language="comment", text=
+        " The predicted position at which the ball will come to a stop" "\n"
+        " optional")
+      @unit (value="m")
+      sequence<robocup_ssl_msgs::msg::Vector2, 1> stop_pos;
+
+      @verbatim (language="comment", text=
+        " The robot that kicked the ball" "\n"
+        " optional")
+      sequence<robocup_ssl_msgs::msg::RobotId, 1> robot_id;
+    };
+  };
+};

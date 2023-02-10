@@ -1,0 +1,19 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from consai_msgs/msg/GoalPose.msg
+// generated code does not contain a copyright notice
+
+#include "consai_msgs/msg/State2D.idl"
+
+module consai_msgs {
+  module msg {
+    @verbatim (language="comment", text=
+      " Controllerが出力する目標姿勢")
+    struct GoalPose {
+      uint32 robot_id;
+
+      boolean team_is_yellow;
+
+      consai_msgs::msg::State2D pose;
+    };
+  };
+};

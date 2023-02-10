@@ -1,0 +1,78 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from robocup_ssl_msgs/msg/referee/TeamInfo.msg
+// generated code does not contain a copyright notice
+
+
+module robocup_ssl_msgs {
+  module msg {
+    @verbatim (language="comment", text=
+      " This msg file is a copy of 'ssl_gc_referee_message.proto'" "\n"
+      " https://github.com/RoboCup-SSL/ssl-game-controller/blob/master/proto/ssl_gc_referee_message.proto")
+    struct TeamInfo {
+      @verbatim (language="comment", text=
+        " The team's name (empty string if operator has not typed anything).")
+      string name;
+
+      @verbatim (language="comment", text=
+        " The number of goals scored by the team during normal play and overtime.")
+      uint32 score;
+
+      @verbatim (language="comment", text=
+        " The number of red cards issued to the team since the beginning of the game.")
+      uint32 red_cards;
+
+      @verbatim (language="comment", text=
+        " The amount of time (in microseconds) left on each yellow card issued to the team." "\n"
+        " If no yellow cards are issued, this array has no elements." "\n"
+        " Otherwise, times are ordered from smallest to largest.")
+      sequence<uint32> yellow_card_times;
+
+      @verbatim (language="comment", text=
+        " The total number of yellow cards ever issued to the team.")
+      uint32 yellow_cards;
+
+      @verbatim (language="comment", text=
+        " The number of timeouts this team can still call." "\n"
+        " If in a timeout right now, that timeout is excluded.")
+      uint32 timeouts;
+
+      @verbatim (language="comment", text=
+        " The number of microseconds of timeout this team can use.")
+      uint32 timeout_time;
+
+      @verbatim (language="comment", text=
+        " The pattern number of this team's goalkeeper.")
+      uint32 goalkeeper;
+
+      @verbatim (language="comment", text=
+        " The total number of countable fouls that act towards yellow cards" "\n"
+        " optional")
+      sequence<uint32, 1> foul_counter;
+
+      @verbatim (language="comment", text=
+        " The number of consecutive ball placement failures of this team" "\n"
+        " optional")
+      sequence<uint32, 1> ball_placement_failures;
+
+      @verbatim (language="comment", text=
+        " Indicate if the team is able and allowed to place the ball" "\n"
+        " optional")
+      sequence<boolean, 1> can_place_ball;
+
+      @verbatim (language="comment", text=
+        " The maximum number of bots allowed on the field based on division and cards" "\n"
+        " optional")
+      sequence<uint32, 1> max_allowed_bots;
+
+      @verbatim (language="comment", text=
+        " The team has submitted an intent to substitute one or more robots at the next chance" "\n"
+        " optional")
+      sequence<boolean, 1> bot_substitution_intent;
+
+      @verbatim (language="comment", text=
+        " Indicate if the team reached the maximum allowed ball placement failures and is thus not allowed to place the ball anymore" "\n"
+        " optional")
+      sequence<boolean, 1> ball_placement_failures_reached;
+    };
+  };
+};

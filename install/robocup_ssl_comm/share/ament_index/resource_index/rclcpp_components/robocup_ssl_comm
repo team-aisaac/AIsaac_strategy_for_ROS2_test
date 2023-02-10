@@ -1,0 +1,3 @@
+robocup_ssl_comm::Vision;lib/libvision_component.so
+robocup_ssl_comm::GameController;lib/libgame_controller_component.so
+robocup_ssl_comm::GrSim;lib/libgrsim_component.so

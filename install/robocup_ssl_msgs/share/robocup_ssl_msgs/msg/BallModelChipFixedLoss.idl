@@ -1,0 +1,27 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from robocup_ssl_msgs/msg/geometry/BallModelChipFixedLoss.msg
+// generated code does not contain a copyright notice
+
+
+module robocup_ssl_msgs {
+  module msg {
+    @verbatim (language="comment", text=
+      " This msg file is a copy of 'messages_robocup_ssl_geometry.proto'" "\n"
+      " https://github.com/RoboCup-SSL/ssl-vision/blob/master/src/shared/proto/messages_robocup_ssl_geometry.proto")
+    struct BallModelChipFixedLoss {
+      @verbatim (language="comment", text=
+        " Fixed-Loss model for chipped balls." "\n"
+        " Uses fixed damping factors for xy and z direction per hop." "\n"
+        " Chip kick velocity damping factor in XY direction for the first hop")
+      double damping_xy_first_hop;
+
+      @verbatim (language="comment", text=
+        " Chip kick velocity damping factor in XY direction for all following hops")
+      double damping_xy_other_hops;
+
+      @verbatim (language="comment", text=
+        " Chip kick velocity damping factor in Z direction for all hops")
+      double damping_z;
+    };
+  };
+};

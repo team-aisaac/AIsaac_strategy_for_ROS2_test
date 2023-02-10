@@ -1,0 +1,28 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from consai_msgs/msg/ConstraintXY.msg
+// generated code does not contain a copyright notice
+
+#include "consai_msgs/msg/ConstraintObject.idl"
+
+module consai_msgs {
+  module msg {
+    @verbatim (language="comment", text=
+      " 姿勢x,yの拘束条件")
+    struct ConstraintXY {
+      @verbatim (language="comment", text=
+        " value_x, yをfiled sizeに合わせて-1 ~ 1に正規化されたものとして扱う")
+      @default (value=FALSE)
+      boolean normalized;
+
+      @verbatim (language="comment", text=
+        " 実数値")
+      sequence<double, 1> value_x;
+
+      @verbatim (language="comment", text=
+        " 実数値")
+      sequence<double, 1> value_y;
+
+      sequence<consai_msgs::msg::ConstraintObject, 1> object;
+    };
+  };
+};

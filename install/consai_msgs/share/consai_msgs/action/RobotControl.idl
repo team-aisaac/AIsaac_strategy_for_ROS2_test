@@ -1,0 +1,93 @@
+// generated from rosidl_adapter/resource/action.idl.em
+// with input from consai_msgs/action/RobotControl.action
+// generated code does not contain a copyright notice
+
+#include "consai_msgs/msg/ConstraintLine.idl"
+#include "consai_msgs/msg/ConstraintPose.idl"
+#include "consai_msgs/msg/ConstraintXY.idl"
+#include "consai_msgs/msg/State2D.idl"
+
+module consai_msgs {
+  module action {
+    @verbatim (language="comment", text=
+      " 制御を停止する場合はstopをtrue" "\n"
+      " actionは瞬時に完了する")
+    struct RobotControl_Goal {
+      @default (value=FALSE)
+      boolean stop;
+
+      @verbatim (language="comment", text=
+        " 目標値に到達しても制御を続けてほしいときはtrue" "\n"
+        " actionは瞬時に完了する")
+      @default (value=FALSE)
+      boolean keep_control;
+
+      @verbatim (language="comment", text=
+        " XY方向の最大速度m/s を制限する" "\n"
+        " STOPゲーム中は走行速度を抑えなくてはならない")
+      sequence<double, 1> max_velocity_xy;
+
+      @verbatim (language="comment", text=
+        " 移動の目標値")
+      sequence<consai_msgs::msg::ConstraintPose, 1> pose;
+
+      sequence<consai_msgs::msg::ConstraintLine, 1> line;
+
+      @verbatim (language="comment", text=
+        " ボール操作関連のフラグ" "\n"
+        " kick_enable = trueでボールを蹴る")
+      @default (value=FALSE)
+      boolean kick_enable;
+
+      @verbatim (language="comment", text=
+        " kick_pass = falseで最大速度でボールを蹴る" "\n"
+        " kick_pass = trueで低速度でボールを蹴る")
+      @default (value=FALSE)
+      boolean kick_pass;
+
+      @verbatim (language="comment", text=
+        " kick_setplay = true でセットプレイ用の落ち着いたキックを実行する")
+      @default (value=FALSE)
+      boolean kick_setplay;
+
+      @verbatim (language="comment", text=
+        " キックの目標地点")
+      consai_msgs::msg::ConstraintXY kick_target;
+
+      @verbatim (language="comment", text=
+        " dribble_enable = trueで、dribble_targetに向かってボールを運ぶ")
+      @default (value=FALSE)
+      boolean dribble_enable;
+
+      consai_msgs::msg::ConstraintXY dribble_target;
+
+      @verbatim (language="comment", text=
+        " 転がっているボールを受け取るときはtrue")
+      @default (value=FALSE)
+      boolean receive_ball;
+
+      @verbatim (language="comment", text=
+        " リフレクトシュート")
+      @default (value=FALSE)
+      boolean reflect_shoot;
+
+      @verbatim (language="comment", text=
+        " 衝突回避は安全のためデフォルトでtrue")
+      @default (value=TRUE)
+      boolean avoid_obstacles;
+
+      @default (value=TRUE)
+      boolean avoid_placement;
+    };
+    struct RobotControl_Result {
+      boolean success;
+
+      string message;
+    };
+    struct RobotControl_Feedback {
+      consai_msgs::msg::State2D remaining_pose;
+
+      consai_msgs::msg::State2D present_velocity;
+    };
+  };
+};
