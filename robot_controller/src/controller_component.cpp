@@ -23,6 +23,33 @@ Controller::Controller(const rclcpp::NodeOptions & options)
 {
   using namespace std::placeholders;
 
+  //各変数の設定
+  declare_parameter("team_is_yellow", false);
+  declare_parameter("invert", false);
+  std::vector<std::string> prefix_list = {"vx_", "vy_", "vtheta_"};
+  for (const auto & prefix : prefix_list) {
+    declare_parameter(prefix + "p", 1.5);
+    declare_parameter(prefix + "i", 0.0);
+    declare_parameter(prefix + "d", 0.2);
+    declare_parameter(prefix + "i_max", 0.0);
+    declare_parameter(prefix + "i_min", 0.0);
+    declare_parameter(prefix + "antiwindup", true);
+  }
+  declare_parameter("max_acceleration_xy", 2.0);
+  declare_parameter("max_acceleration_theta", 2.0 * M_PI);
+  declare_parameter("max_velocity_xy", 2.0);
+  declare_parameter("max_velocity_theta", 2.0 * M_PI);
+  max_acceleration_xy_ = get_parameter("max_acceleration_xy").get_value<double>();
+  max_acceleration_theta_ = get_parameter("max_acceleration_theta").get_value<double>();
+  max_velocity_xy_ = get_parameter("max_velocity_xy").get_value<double>();
+  max_velocity_theta_ = get_parameter("max_velocity_theta").get_value<double>();
+  //チームの色や攻める方向の設定を反映
+  parser_.set_invert(get_parameter("invert").get_value<bool>());
+  parser_.set_team_is_yellow(get_parameter("team_is_yellow").get_value<bool>());
+  team_is_yellow_ = get_parameter("team_is_yellow").get_value<bool>();
+  //ログを残す
+  RCLCPP_INFO(this->get_logger(), "is yellow:%d", team_is_yellow_);
+
   std::string team_color = "blue";
   if (team_is_yellow_) {
     team_color = "yellow";
@@ -40,6 +67,9 @@ Controller::Controller(const rclcpp::NodeOptions & options)
     control_enable_.push_back(true);    //制御を行うかを格納するフラグ：TRUE->制御する・FALSE->制御しない
     need_response_.push_back(false);    //何？
     system_stop_.push_back(true);       //戦略側の停止要求があるかを判定する(本当に必要かをもう一度検証する)
+    last_update_time_.push_back(steady_clock_.now()); //制御に利用する１ループ前の時刻を保持する変数
+    last_world_vel_.push_back(State());               //制御に利用する１ループ前のロボットの即時ド情報を保持する変数
+  
 
     //ロボットを制御するためのコマンドのパブリッシュ
     pub_command_.push_back(
@@ -66,6 +96,38 @@ Controller::Controller(const rclcpp::NodeOptions & options)
         std::bind(&Controller::handle_accepted, this, _1, i))
     );
 
+    // PID制御器の初期化
+    pid_vx_.push_back(
+      std::make_shared<control_toolbox::Pid>(
+        get_parameter("vx_p").get_value<double>(),
+        get_parameter("vx_i").get_value<double>(),
+        get_parameter("vx_d").get_value<double>(),
+        get_parameter("vx_i_max").get_value<double>(),
+        get_parameter("vx_i_min").get_value<double>(),
+        get_parameter("vx_antiwindup").get_value<bool>()
+      )
+    );
+    pid_vy_.push_back(
+      std::make_shared<control_toolbox::Pid>(
+        get_parameter("vy_p").get_value<double>(),
+        get_parameter("vy_i").get_value<double>(),
+        get_parameter("vy_d").get_value<double>(),
+        get_parameter("vy_i_max").get_value<double>(),
+        get_parameter("vy_i_min").get_value<double>(),
+        get_parameter("vy_antiwindup").get_value<bool>()
+      )
+    );
+    pid_vtheta_.push_back(
+      std::make_shared<control_toolbox::Pid>(
+        get_parameter("vtheta_p").get_value<double>(),
+        get_parameter("vtheta_i").get_value<double>(),
+        get_parameter("vtheta_d").get_value<double>(),
+        get_parameter("vtheta_i_max").get_value<double>(),
+        get_parameter("vtheta_i_min").get_value<double>(),
+        get_parameter("vtheta_antiwindup").get_value<bool>()
+      )
+    );
+
     //タイマーを制作してロボットを制御する
     // bindでは関数を宣言できなかったので、ラムダ式を使用する(by consai)
     // Ref: https://github.com/ros2/rclcpp/issues/273#issuecomment-263826519
@@ -80,9 +142,9 @@ Controller::Controller(const rclcpp::NodeOptions & options)
         200ms, [this, robot_id = i]() {this->on_timer_pub_stop_command(robot_id);}
       )
     );
-
-
+    
     //以下各ロボットの制御外
+
     //サブスクライブ（ノードからデータを取得）
     //画像を分析した情報を取得
     sub_detection_tracked_ = create_subscription<TrackedFrame>(
@@ -94,6 +156,42 @@ Controller::Controller(const rclcpp::NodeOptions & options)
     //    "referee", 10, std::bind(&Controller::callback_referee, this, _1));
     //sub_parsed_referee_ = create_subscription<ParsedReferee>(
     //    "parsed_referee", 10, std::bind(&Controller::callback_parsed_referee, this, _1));
+
+    //PIDパラメータをパラメータファイルから読み込む
+    auto param_change_callback =
+    [this](std::vector<rclcpp::Parameter> parameters) {
+      // ROSパラメータの更新
+      auto result = rcl_interfaces::msg::SetParametersResult();
+      result.successful = true;
+      for (const auto & parameter : parameters) {
+        if (update_pid_gain_from_param(parameter, "vx_", pid_vx_)) {
+          RCLCPP_INFO(this->get_logger(), "Update vx_pid gains.");
+        } else if (update_pid_gain_from_param(parameter, "vy_", pid_vy_)) {
+          RCLCPP_INFO(this->get_logger(), "Update vy_pid gains.");
+        } else if (update_pid_gain_from_param(parameter, "vtheta_", pid_vtheta_)) {
+          RCLCPP_INFO(this->get_logger(), "Update vtheta_pid gains.");
+        }
+
+        if (parameter.get_name() == "max_acceleration_xy") {
+          max_acceleration_xy_ = get_parameter("max_acceleration_xy").get_value<double>();
+          RCLCPP_INFO(this->get_logger(), "Update max_acceleration_xy.");
+        }
+        if (parameter.get_name() == "max_acceleration_theta") {
+          max_acceleration_theta_ = get_parameter("max_acceleration_theta").get_value<double>();
+          RCLCPP_INFO(this->get_logger(), "Update max_acceleration_theta.");
+        }
+        if (parameter.get_name() == "max_velocity_xy") {
+          max_velocity_xy_ = get_parameter("max_velocity_xy").get_value<double>();
+          RCLCPP_INFO(this->get_logger(), "Update max_velocity_xy.");
+        }
+        if (parameter.get_name() == "max_velocity_theta") {
+          max_velocity_theta_ = get_parameter("max_velocity_theta").get_value<double>();
+          RCLCPP_INFO(this->get_logger(), "Update max_velocity_theta.");
+        }
+      }
+      return result;
+    };
+  handler_change_param_ = add_on_set_parameters_callback(param_change_callback);
 }
 
 void Controller::callback_detection_tracked(const TrackedFrame::SharedPtr msg)
@@ -132,6 +230,48 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
     switch_to_stop_control_mode(robot_id, false, error_msg);
     return;
   }
+
+  //ロボットを制御する
+  //変数の初期化
+  State goal_pose;
+  double kick_power = 0.0;
+  double dribble_power = 0.0;
+  State world_vel;
+  auto current_time = steady_clock_.now();
+  auto duration = current_time - last_update_time_[robot_id];
+  //指示の種類を識別する
+  //パターン1：目標値に到達するだけの場合
+  //次のループまでの目標値(x ,y, theta)を計算する
+  goal_pose.x = 0;
+  goal_pose.y = 0;
+  goal_pose.theta = 0;
+  //ワールド座標でのロボットの目標速度を計算する
+  // ワールド座標系での目標速度を算出
+  world_vel.x = pid_vx_[robot_id]->computeCommand(
+    goal_pose.x - my_robot.pos.x,
+    duration.nanoseconds());
+  world_vel.y = pid_vy_[robot_id]->computeCommand(
+    goal_pose.y - my_robot.pos.y,
+    duration.nanoseconds());
+  world_vel.theta =
+    pid_vtheta_[robot_id]->computeCommand(
+    tools::normalize_theta(
+      goal_pose.theta -
+      my_robot.orientation), duration.nanoseconds());
+
+  // ワールド座標系でのxy速度をロボット座標系に変換
+  command_msg->velocity_x = std::cos(my_robot.orientation) * world_vel.x + std::sin(
+    my_robot.orientation) * world_vel.y;
+  command_msg->velocity_y = -std::sin(my_robot.orientation) * world_vel.x + std::cos(
+    my_robot.orientation) * world_vel.y;
+  command_msg->velocity_theta = world_vel.theta;
+  
+  // 制御値を出力する
+  pub_command_[robot_id]->publish(std::move(command_msg));
+
+  // 制御更新時間と速度を保存する
+  last_update_time_[robot_id] = current_time;
+  last_world_vel_[robot_id] = world_vel;
 }
 
 void Controller::on_timer_pub_stop_command(const unsigned int robot_id)
