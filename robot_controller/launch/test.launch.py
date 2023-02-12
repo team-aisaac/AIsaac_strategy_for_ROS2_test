@@ -61,12 +61,12 @@ def generate_launch_description():
                                 {'invert': LaunchConfiguration('invert')}],
                     extra_arguments=[{'use_intra_process_comms': True}],
                     ),
-                #ComposableNode(
-                #    package='consai_robot_controller',
-                #    plugin='consai_robot_controller::GrSimCommandConverter',
-                #    name='command_converter',
-                #    extra_arguments=[{'use_intra_process_comms': True}],
-                #    ),
+                ComposableNode(
+                    package='robot_controller',
+                    plugin='robot_controller::GrSimCommandConverter',
+                    name='command_converter',
+                    extra_arguments=[{'use_intra_process_comms': True}],
+                    ),
                 ComposableNode(
                     package='consai_vision_tracker',
                     plugin='consai_vision_tracker::Tracker',

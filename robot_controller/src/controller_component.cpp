@@ -108,7 +108,7 @@ parser_.set_geometry(msg);
 
 void Controller::on_timer_pub_control_command(const unsigned int robot_id)
 {
-  RCLCPP_INFO(this->get_logger(),"control_command");
+  //RCLCPP_INFO(this->get_logger(),"control_command");
   // 制御器を更新し、コマンドをpublishするタイマーコールバック関数
   // 制御が許可されていない場合は、このタイマーを止めて、停止コマンドタイマーを起動する
   if (control_enable_[robot_id] == false) {
@@ -136,7 +136,7 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
 
 void Controller::on_timer_pub_stop_command(const unsigned int robot_id)
 {
-  RCLCPP_INFO(this->get_logger(),"stop_command");
+  //RCLCPP_INFO(this->get_logger(),"stop_command");
   
   // 停止コマンドをpublishするタイマーコールバック関数
   // 通信帯域を圧迫しないため、この関数は低周期（例:1s）で実行すること

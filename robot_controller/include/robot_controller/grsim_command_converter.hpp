@@ -25,7 +25,7 @@
 #include "robocup_ssl_msgs/msg/commands.hpp"
 #include "robocup_ssl_msgs/msg/robot_command.hpp"
 
-namespace consai_robot_controller
+namespace robot_controller
 {
 
 using RobotCommand = robot_command_msgs::msg::RobotCommand;
@@ -42,7 +42,7 @@ protected:
   void on_timer();
 
 private:
-  void callback_consai_command_(const RobotCommand::SharedPtr msg);
+  void callback_robot_command_(const RobotCommand::SharedPtr msg);
 
   rclcpp::TimerBase::SharedPtr timer_;
   std::vector<rclcpp::Subscription<RobotCommand>::SharedPtr> subs_robot_command_;

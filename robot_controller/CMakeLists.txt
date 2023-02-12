@@ -90,7 +90,7 @@ install(DIRECTORY
 
 install(TARGETS
   controller_component
-  #grsim_command_converter
+  grsim_command_converter
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib

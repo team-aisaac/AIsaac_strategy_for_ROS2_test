@@ -20,7 +20,7 @@
 
 using namespace std::chrono_literals;
 
-namespace consai_robot_controller
+namespace robot_controller
 {
 
 GrSimCommandConverter::GrSimCommandConverter(const rclcpp::NodeOptions & options)
@@ -33,7 +33,7 @@ GrSimCommandConverter::GrSimCommandConverter(const rclcpp::NodeOptions & options
   for (int i = 0; i < 16; i++) {
     auto sub_command = create_subscription<RobotCommand>(
       "robot" + std::to_string(i) + "/command",
-      10, std::bind(&GrSimCommandConverter::callback_consai_command_, this, _1));
+      10, std::bind(&GrSimCommandConverter::callback_robot_command_, this, _1));
     subs_robot_command_.push_back(sub_command);
   }
 
@@ -73,7 +73,7 @@ void GrSimCommandConverter::on_timer()
   pub_grsim_commands_->publish(std::move(commands_msg));
 }
 
-void GrSimCommandConverter::callback_consai_command_(const RobotCommand::SharedPtr msg)
+void GrSimCommandConverter::callback_robot_command_(const RobotCommand::SharedPtr msg)
 {
   robot_commands_.push_back(msg);
   // バッファの肥大化を防ぐ
@@ -86,4 +86,4 @@ void GrSimCommandConverter::callback_consai_command_(const RobotCommand::SharedP
 
 #include "rclcpp_components/register_node_macro.hpp"
 
-RCLCPP_COMPONENTS_REGISTER_NODE(consai_robot_controller::GrSimCommandConverter)
+RCLCPP_COMPONENTS_REGISTER_NODE(robot_controller::GrSimCommandConverter)
