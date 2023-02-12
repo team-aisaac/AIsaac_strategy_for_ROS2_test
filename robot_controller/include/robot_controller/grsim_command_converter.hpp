@@ -18,8 +18,9 @@
 #include <memory>
 #include <vector>
 
-#include "consai_frootspi_msgs/msg/robot_command.hpp"
-#include "consai_robot_controller/visibility_control.h"
+#include "robot_command_msgs/msg/robot_command.hpp"
+//#include "consai_frootspi_msgs/msg/robot_command.hpp"
+#include "robot_controller/visibility_control.h"
 #include "rclcpp/rclcpp.hpp"
 #include "robocup_ssl_msgs/msg/commands.hpp"
 #include "robocup_ssl_msgs/msg/robot_command.hpp"
@@ -27,26 +28,26 @@
 namespace consai_robot_controller
 {
 
-using ConsaiCommand = consai_frootspi_msgs::msg::RobotCommand;
+using RobotCommand = robot_command_msgs::msg::RobotCommand;
 using GrSimCommands = robocup_ssl_msgs::msg::Commands;
 using GrSimRobotCommand = robocup_ssl_msgs::msg::RobotCommand;
 
 class GrSimCommandConverter : public rclcpp::Node
 {
 public:
-  CONSAI_ROBOT_CONTROLLER_PUBLIC
+  ROBOT_CONTROLLER_PUBLIC
   explicit GrSimCommandConverter(const rclcpp::NodeOptions & options);
 
 protected:
   void on_timer();
 
 private:
-  void callback_consai_command_(const ConsaiCommand::SharedPtr msg);
+  void callback_consai_command_(const RobotCommand::SharedPtr msg);
 
   rclcpp::TimerBase::SharedPtr timer_;
-  std::vector<rclcpp::Subscription<ConsaiCommand>::SharedPtr> subs_consai_command_;
+  std::vector<rclcpp::Subscription<RobotCommand>::SharedPtr> subs_robot_command_;
   rclcpp::Publisher<GrSimCommands>::SharedPtr pub_grsim_commands_;
-  std::vector<ConsaiCommand::SharedPtr> consai_commands_;
+  std::vector<RobotCommand::SharedPtr> robot_commands_;
 };
 
 }  // namespace consai_robot_controller

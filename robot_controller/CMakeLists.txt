@@ -47,20 +47,20 @@ ament_target_dependencies(controller_component
 rclcpp_components_register_nodes(controller_component "robot_controller::Controller")
 
 # GrSim Command Converter
-#[[
 add_library(grsim_command_converter SHARED
   src/grsim_command_converter.cpp
 )
 target_compile_definitions(grsim_command_converter
   PRIVATE "ROBOT_CONTROLLER_BUILDING_DLL")
 ament_target_dependencies(grsim_command_converter
+  robot_command_msgs
   consai_msgs
   rclcpp
   rclcpp_components
   robocup_ssl_msgs
 )
-#rclcpp_components_register_nodes(grsim_command_converter "robot_controller::GrSimCommandConverter")
-]]
+rclcpp_components_register_nodes(grsim_command_converter "robot_controller::GrSimCommandConverter")
+
 
 # Exports
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)

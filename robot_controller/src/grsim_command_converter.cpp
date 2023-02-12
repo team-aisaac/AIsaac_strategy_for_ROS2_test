@@ -16,7 +16,7 @@
 #include <string>
 #include <utility>
 
-#include "consai_robot_controller/grsim_command_converter.hpp"
+#include "robot_controller/grsim_command_converter.hpp"
 
 using namespace std::chrono_literals;
 
@@ -31,10 +31,10 @@ GrSimCommandConverter::GrSimCommandConverter(const rclcpp::NodeOptions & options
   pub_grsim_commands_ = create_publisher<GrSimCommands>("/commands", 10);
 
   for (int i = 0; i < 16; i++) {
-    auto sub_command = create_subscription<ConsaiCommand>(
+    auto sub_command = create_subscription<RobotCommand>(
       "robot" + std::to_string(i) + "/command",
       10, std::bind(&GrSimCommandConverter::callback_consai_command_, this, _1));
-    subs_consai_command_.push_back(sub_command);
+    subs_robot_command_.push_back(sub_command);
   }
 
   timer_ = create_wall_timer(10ms, std::bind(&GrSimCommandConverter::on_timer, this));
@@ -44,14 +44,14 @@ void GrSimCommandConverter::on_timer()
 {
   // consai用のロボットコマンドをgrSim用のコマンドに変換してpublishする
 
-  if (consai_commands_.size() == 0) {
+  if (robot_commands_.size() == 0) {
     return;
   }
 
   auto commands_msg = std::make_unique<GrSimCommands>();
 
   bool team_is_yellow;
-  for (auto it = consai_commands_.begin(); it != consai_commands_.end(); ) {
+  for (auto it = robot_commands_.begin(); it != robot_commands_.end(); ) {
     GrSimRobotCommand robot_command;
     team_is_yellow = (*it)->team_is_yellow;
     robot_command.id = (*it)->robot_id;
@@ -66,19 +66,19 @@ void GrSimCommandConverter::on_timer()
     robot_command.kickspeedx = (*it)->kick_power;
 
     commands_msg->robot_commands.push_back(robot_command);
-    it = consai_commands_.erase(it);
+    it = robot_commands_.erase(it);
   }
 
   commands_msg->isteamyellow = team_is_yellow;
   pub_grsim_commands_->publish(std::move(commands_msg));
 }
 
-void GrSimCommandConverter::callback_consai_command_(const ConsaiCommand::SharedPtr msg)
+void GrSimCommandConverter::callback_consai_command_(const RobotCommand::SharedPtr msg)
 {
-  consai_commands_.push_back(msg);
+  robot_commands_.push_back(msg);
   // バッファの肥大化を防ぐ
-  if (consai_commands_.size() > 200) {
-    consai_commands_.clear();
+  if (robot_commands_.size() > 200) {
+    robot_commands_.clear();
   }
 }
 
