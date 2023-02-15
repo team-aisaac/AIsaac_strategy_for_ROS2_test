@@ -10,6 +10,10 @@
 #include "robot_controller/geometry_tools.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+#include "robot_controller/dwa_include/dwa.h"
+#include "robot_controller/dwa_include/DWA_path_recover.h"
+#include "robot_controller/dwa_include/RaspiTrapezoidalControl.h"
+
 namespace robot_controller
 {
 
@@ -69,7 +73,9 @@ Controller::Controller(const rclcpp::NodeOptions & options)
     system_stop_.push_back(true);       //戦略側の停止要求があるかを判定する(本当に必要かをもう一度検証する)
     last_update_time_.push_back(steady_clock_.now()); //制御に利用する１ループ前の時刻を保持する変数
     last_world_vel_.push_back(State());               //制御に利用する１ループ前のロボットの即時ド情報を保持する変数
-  
+    robot_vertual_vel.push_back(State());             //ロボットを制御するために、その時の制御ループの目標速度(ワールド座標系)を格納する 
+    trape_controle_flag.push_back(false);             //前回のループで台形制御を行っていたかを判定するフラグ
+    trape_c.push_back(trape_con());                   //台形制御を行うための構造体 
 
     //ロボットを制御するためのコマンドのパブリッシュ
     pub_command_.push_back(
@@ -234,6 +240,8 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
   //ロボットを制御する
   //変数の初期化
   State goal_pose;
+  State next_goal_pose;   //次のループまでのゴール座標(DWAや台形制御を用いて計算される目標値)
+  State midle_target;     //DWAの中間目標地点を格納する
   double kick_power = 0.0;
   double dribble_power = 0.0;
   State world_vel;
@@ -242,9 +250,65 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
   //指示の種類を識別する
   //パターン1：目標値に到達するだけの場合
   //次のループまでの目標値(x ,y, theta)を計算する
+  //仮の目標値設定
   goal_pose.x = 0;
   goal_pose.y = 0;
   goal_pose.theta = 0;
+  
+  //DWAを行うための変数設定
+  next_goal_pose.x = my_robot.pos.x;
+  next_goal_pose.y = my_robot.pos.y;
+  next_goal_pose.theta = my_robot.orientation;
+  //今後戦略版から送信するコマンド
+  bool prohidited_zone_ignore = 0;
+  bool midle_target_flag = 0;
+  //障害物の抽出
+  int32_t numOfObstacle = 0;
+  int32_t obs_x[ROBOT_NUM], obs_y[ROBOT_NUM], obs_vx[ROBOT_NUM], obs_vy[ROBOT_NUM], obs_ax[ROBOT_NUM], obs_ay[ROBOT_NUM];
+  TrackedRobot obs_robot[ROBOT_NUM];
+  int32_t k = 0;
+  for(uint32_t j = 0; j < ROBOT_NUM; j++){
+    if (parser_.extract_robot(j, team_is_yellow_, obs_robot[j]) && j != robot_id){
+      numOfObstacle++;
+      obs_x[k] = obs_robot[j].pos.x;
+      obs_y[k] = obs_robot[j].pos.y;
+      obs_vx[k] = obs_robot[j].vel[0].x;
+      obs_vy[k] = obs_robot[j].vel[0].y;
+      obs_ax[k] = 0;
+      obs_ay[k] = 0;
+    }
+  }
+  //DWAの出力のための変数
+  bool is_enable;
+  bool path_enable;
+  int32_t output_vx;
+  int32_t output_vy;
+  int32_t output_omega;
+  int32_t output_ax;
+  int32_t output_ay;
+  
+  //DWAの実施
+  execDWA((int32_t) my_robot.pos.x, (int32_t) my_robot.pos.y, (int32_t) my_robot.orientation, (int32_t) my_robot.vel[0].x, (int32_t) my_robot.vel[0].y, (int32_t) my_robot.vel_angular[0], 
+          (int32_t*) &next_goal_pose.x, (int32_t*) &next_goal_pose.y, (int32_t) next_goal_pose.theta, (int32_t*) &midle_target.x, (int32_t*) &midle_target.y,
+          numOfObstacle, obs_x, obs_y, obs_vx, obs_vx, obs_ax, obs_ay, prohidited_zone_ignore, 
+          &midle_target_flag, &is_enable, &path_enable, &output_vx, &output_vy, &output_omega, &output_ax, &output_ay);
+  //DWAの結果を受けてDWAとするか台形制御とするかを判別しロボットの目標値を算出する。
+  robot_vertual_vel[robot_id].x = my_robot.vel[0].x;
+  robot_vertual_vel[robot_id].y = my_robot.vel[0].y;
+  if(is_enable == 1 && path_enable == 1){
+    //DWAを行う
+    DWA_path_recover((float*) &next_goal_pose.x, (float*) &next_goal_pose.y, (float*) &robot_vertual_vel[robot_id].x, (float*) &robot_vertual_vel[robot_id].x, (float) output_ax, 
+                      (float) output_ay, (float) max_velocity_xy_);
+    trape_controle_flag[robot_id] = 0;
+  }
+  else if(is_enable == 1 && path_enable == 0){
+    //台形制御を行う
+    trapezoidal_control((int32_t) next_goal_pose.x, (int32_t) next_goal_pose.y, &trape_c[robot_id]);
+  }
+  else if(is_enable == 0){
+    trape_controle_flag[robot_id] = 0;
+  }
+  
   //ワールド座標でのロボットの目標速度を計算する
   // ワールド座標系での目標速度を算出
   world_vel.x = pid_vx_[robot_id]->computeCommand(

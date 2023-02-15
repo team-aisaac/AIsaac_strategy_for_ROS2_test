@@ -20,6 +20,8 @@
 #include "robocup_ssl_msgs/msg/tracked_frame.hpp"
 #include "robocup_ssl_msgs/msg/tracked_robot.hpp"
 
+#include "robot_controller/dwa_include/RaspiTrapezoidalControl.h"
+
 namespace robot_controller
 {
 using GoalPose = consai_msgs::msg::GoalPose;
@@ -85,6 +87,7 @@ private:
   std::vector<bool> need_response_;
   std::vector<std::shared_ptr<GoalHandleRobotControl>> goal_handle_;
   std::vector<State> last_world_vel_;
+  std::vector<State> robot_vertual_vel;
 
   robot_controller::FieldInfoParser parser_;
   rclcpp::Subscription<TrackedFrame>::SharedPtr sub_detection_tracked_;
@@ -98,6 +101,10 @@ private:
   double max_acceleration_theta_;
   double max_velocity_xy_;
   double max_velocity_theta_;
+
+  //DWAと台形制御用の変数
+  std::vector<bool> trape_controle_flag;          //前回のループで台形制御を行っていたかを判定するフラグ
+  std::vector<trape_con> trape_c;                 //台形制御を行うための構造体 
 };
 
 }  // namespace robot_controller
