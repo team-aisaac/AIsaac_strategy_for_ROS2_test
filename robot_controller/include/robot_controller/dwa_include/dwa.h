@@ -1,7 +1,7 @@
 #ifndef _DWA_H_
 #define _DWA_H_
 
-#define TIME_STEP 0.1          //cdwa ontroll time step
+#define DWA_CAL_TIME_STEP 0.1          //cdwa ontroll time step
 #define TIME_STEP_RECIPROCAL 10          //reciprocal cdwa ontroll time step
 
 
@@ -42,12 +42,6 @@
 //DWAを使用しない速度と加速度の成す角度(直線的な躍度制御を利用する)
 #define GNORE_ANGLE 5   //(deg)
 #define GNORE_ANGLE2 10   //(deg)
-
-//侵入禁止エリアに侵入している際に使うマクロ
-#define MAX_SEARCH_DISTANCE 1000    //侵入禁止エリア外に出るために探索する最大範囲(mm)
-#define DELTA_SEARCH_DISTANCE 100   //侵入禁止エリア外に出るために探索する際の探索幅(mm)
-//フィールドの壁への衝突を回避するときのマージン設定
-#define FIELD_MARGIN 50   //mm
 
 #ifdef __cplusplus
 extern "C" {
@@ -175,6 +169,6 @@ void midle_target_velo_limit_long_path( int32_t x, int32_t y, int32_t Vx, int32_
 void midle_target_velo_limit_fine_path( int32_t x, int32_t y, int32_t Vx, int32_t Vy, int32_t targetX, int32_t targetY, int32_t midle_targetX, int32_t midle_targetY, 
                                         path_fine_prediction *fine_prediction, uint16_t path_size ,uint32_t fine_path_predict_step, bool midle_target_flag);
 #ifdef __cplusplus
-};
+}
 #endif
 #endif // _DWA_H_

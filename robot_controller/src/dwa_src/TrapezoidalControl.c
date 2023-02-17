@@ -4,20 +4,20 @@
 #include<stdlib.h>
 #include <unistd.h>
 #include<math.h>
-#include "TrapezoidalControl.h"
+#include "robot_controller/dwa_include/TrapezoidalControl.h"
+#include "robot_controller/tools.h"
 
 #include <time.h>
 
 //int test_time_step = 0;
 
-float robot_max_velo = 3000; //ロボットの最大速度(mm/s)
-float robot_max_accel = 1500; //ロボットの最大速度(mm/s^2)
-float robot_jerk = 4000;        //ロボットの躍度(mm/s^3)
-
 bool micon_trapezoidal_DWA_change(int32_t x, int32_t y, int32_t vx, int32_t vy, micon_trape_con *trape_c, int32_t targetX, int32_t targetY, 
-                            float ax, float ay, bool trape_c_flag, bool dwa_enable_flag, bool dwa_pathe_enable_flag){
+                                    bool trape_c_flag, bool dwa_enable_flag, bool dwa_pathe_enable_flag){
+    if(trape_c_flag == 1){
+        return trape_c_flag;
+    }
     //DWAから台形制御へ遷移するとき
-    if(dwa_enable_flag == 1 && dwa_pathe_enable_flag == 0 && trape_c_flag == 0){
+    else if(dwa_enable_flag == 1 && dwa_pathe_enable_flag == 0 && trape_c_flag == 0){
         float distance;
         float velocity;
         if((x-targetX)*(x-targetX) + (y-targetY)*(y-targetY) != 0){
@@ -69,7 +69,7 @@ bool micon_trapezoidal_DWA_change(int32_t x, int32_t y, int32_t vx, int32_t vy, 
     return trape_c_flag;
 }
 
-int8_t jerk_flag_check(float distance, float braking_distance){
+int8_t micon_jerk_flag_check(float distance, float braking_distance){
     if(distance <= braking_distance){
         return -1;
     }
@@ -119,7 +119,7 @@ void micon_trapezoidal_control(int32_t targetX, int32_t targetY, micon_trape_con
             float t = (a_t + b * trape_c->jerk)/(2 * trape_c->jerk);
             float positive_braking_distance = -trape_c->jerk*t*t*t/6 + trape_c->accel*t*t/2 + trape_c->velocity*t + trape_c->jerk*(b-t)*(b-t)*(b-t)/2;
             float braking_distance = positive_braking_distance - negative_braking_distance;
-            jerk_flag = jerk_flag_check(distance, braking_distance);
+            jerk_flag = micon_jerk_flag_check(distance, braking_distance);
             if(jerk_flag == 1){
                 jerk_flag = 50;
             }
@@ -135,7 +135,7 @@ void micon_trapezoidal_control(int32_t targetX, int32_t targetY, micon_trape_con
         if(-trape_c->max_accel < a_check){
             float t = (trape_c->accel + b * trape_c->jerk)/(2 * trape_c->jerk);
             float braking_distance = -trape_c->jerk*t*t*t/6 + trape_c->accel*t*t/2 + trape_c->velocity*t + trape_c->jerk*(b-t)*(b-t)*(b-t)/6;
-            jerk_flag = jerk_flag_check(distance, braking_distance+1);
+            jerk_flag = micon_jerk_flag_check(distance, braking_distance+1);
             //printf("1,%f,%f\n",distance,braking_distance);
         }
         else if(a_check <= -trape_c->max_accel){
@@ -145,7 +145,7 @@ void micon_trapezoidal_control(int32_t targetX, int32_t targetY, micon_trape_con
             float distance1 = -trape_c->jerk*t*t*t/6 + trape_c->accel*t*t/2 + trape_c->velocity*t;
             float distance2 = trape_c->max_accel * trape_c->max_accel * trape_c->max_accel / (6 * trape_c->jerk * trape_c->jerk);
             float braking_distance = distance1 + (v1 + v2)*(v1 - v2) / (2 * trape_c->max_accel) + distance2;
-            jerk_flag = jerk_flag_check(distance, braking_distance+1);
+            jerk_flag = micon_jerk_flag_check(distance, braking_distance+1);
             //printf("2,%f,%f\n",distance, braking_distance);
         }
         float t = (trape_c->accel+b*trape_c->jerk)/(2*trape_c->jerk);
@@ -175,11 +175,11 @@ void micon_trapezoidal_control(int32_t targetX, int32_t targetY, micon_trape_con
 }
 
 void micon_trapezoidal_init(micon_trape_con *trape_c){
-    trape_c->jerk = robot_jerk;
+    trape_c->jerk = ROBOT_MAX_JARK;
     trape_c->accel = 0;
-    trape_c->max_accel = robot_max_accel;
+    trape_c->max_accel = ROBOT_MAX_ACCEL;
     trape_c->velocity = 0;
-    trape_c->max_velocity = robot_max_velo;
+    trape_c->max_velocity = ROBOT_MAX_VEL;
     trape_c->virtual_x = 0;
     trape_c->virtual_y = 0;
 }
@@ -204,7 +204,7 @@ int main(void) {
     int32_t Obs_y[0];
     int32_t Obs_VX[0];
     int32_t Obs_VY[0];
-    /*
+    //main関数でテストするときはここにコメントアウト記号を追加する
     int32_t num_Obs = 2;
     int32_t Obs_X[2];
     int32_t Obs_y[2];

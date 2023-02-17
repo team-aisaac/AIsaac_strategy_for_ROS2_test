@@ -5,14 +5,11 @@
 #include<unistd.h>
 #include<math.h>
 #include "robot_controller/dwa_include/RaspiTrapezoidalControl.h"
+#include "robot_controller/tools.h"
 
 #include <time.h>
 
 //int test_time_step = 0;
-
-float trap_max_velo = 3000; //ロボットの最大速度(mm/s)
-float trap_max_accel = 1500; //ロボットの最大速度(mm/s^2)
-float robot_jerk = 4000;        //ロボットの躍度(mm/s^3)
 
 bool trapezoidal_DWA_change(int32_t x, int32_t y, int32_t vx, int32_t vy, trape_con *trape_c, int32_t targetX, int32_t targetY, float ax, float ay){
     float distance;
@@ -166,11 +163,11 @@ void trapezoidal_control(int32_t targetX, int32_t targetY, trape_con *trape_c){
 }
 
 void trapezoidal_init(trape_con *trape_c){
-    trape_c->jerk = robot_jerk;
+    trape_c->jerk = ROBOT_MAX_JARK;
     trape_c->accel = 0;
-    trape_c->max_accel = trap_max_accel;
+    trape_c->max_accel = ROBOT_MAX_ACCEL;
     trape_c->velocity = 0;
-    trape_c->max_velocity = trap_max_velo;
+    trape_c->max_velocity = ROBOT_MAX_VEL;
     trape_c->virtual_x = 0;
     trape_c->virtual_y = 0;
 }

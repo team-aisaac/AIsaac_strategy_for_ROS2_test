@@ -20,7 +20,8 @@
 #include "robocup_ssl_msgs/msg/tracked_frame.hpp"
 #include "robocup_ssl_msgs/msg/tracked_robot.hpp"
 
-#include "robot_controller/dwa_include/RaspiTrapezoidalControl.h"
+//#include "robot_controller/dwa_include/RaspiTrapezoidalControl.h"
+#include "robot_controller/dwa_include/TrapezoidalControl.h"
 
 namespace robot_controller
 {
@@ -104,7 +105,7 @@ private:
 
   //DWAと台形制御用の変数
   std::vector<bool> trape_controle_flag;          //前回のループで台形制御を行っていたかを判定するフラグ
-  std::vector<trape_con> trape_c;                 //台形制御を行うための構造体 
+  std::vector<micon_trape_con> trape_c;                 //台形制御を行うための構造体 
 };
 
 }  // namespace robot_controller

@@ -11,8 +11,11 @@
 #include "rclcpp/rclcpp.hpp"
 
 #include "robot_controller/dwa_include/dwa.h"
+#include "robot_controller/dwa_include/Target_abjust.h"
 #include "robot_controller/dwa_include/DWA_path_recover.h"
 #include "robot_controller/dwa_include/RaspiTrapezoidalControl.h"
+#include "robot_controller/dwa_include/TrapezoidalControl.h"
+#include "robot_controller/tools.h"
 
 namespace robot_controller
 {
@@ -75,7 +78,8 @@ Controller::Controller(const rclcpp::NodeOptions & options)
     last_world_vel_.push_back(State());               //制御に利用する１ループ前のロボットの即時ド情報を保持する変数
     robot_vertual_vel.push_back(State());             //ロボットを制御するために、その時の制御ループの目標速度(ワールド座標系)を格納する 
     trape_controle_flag.push_back(false);             //前回のループで台形制御を行っていたかを判定するフラグ
-    trape_c.push_back(trape_con());                   //台形制御を行うための構造体 
+    trape_c.push_back(micon_trape_con());             //台形制御を行うための構造体 
+    micon_trapezoidal_init(&trape_c[i]);              //台形制御を行うための構造体の初期化
 
     //ロボットを制御するためのコマンドのパブリッシュ
     pub_command_.push_back(
@@ -239,14 +243,18 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
 
   //ロボットを制御する
   //変数の初期化
-  State goal_pose;
-  State next_goal_pose;   //次のループまでのゴール座標(DWAや台形制御を用いて計算される目標値)
-  State midle_target;     //DWAの中間目標地点を格納する
   double kick_power = 0.0;
   double dribble_power = 0.0;
-  State world_vel;
   auto current_time = steady_clock_.now();
   auto duration = current_time - last_update_time_[robot_id];
+  State goal_pose;
+  State next_goal_pose;   //次のループまでのゴール座標(DWAや台形制御を用いて計算される目標値)
+  State dwa_robot_vel;   //次のループまでのゴール座標(DWAや台形制御を用いて計算される目標値)
+  State dwa_robot_pose;
+  State midle_target;     //DWAの中間目標地点を格納する
+  int32_t midle_target_x;
+  int32_t midle_target_y;
+  State world_vel;
   //指示の種類を識別する
   //パターン1：目標値に到達するだけの場合
   //次のループまでの目標値(x ,y, theta)を計算する
@@ -254,28 +262,43 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
   goal_pose.x = 0;
   goal_pose.y = 0;
   goal_pose.theta = 0;
-  
   //DWAを行うための変数設定
-  next_goal_pose.x = my_robot.pos.x;
-  next_goal_pose.y = my_robot.pos.y;
-  next_goal_pose.theta = my_robot.orientation;
+  next_goal_pose.x = goal_pose.x*1000;   //単位変換(m ->mm)
+  next_goal_pose.y = goal_pose.y*1000;   //単位変換(m ->mm)
+  next_goal_pose.theta = goal_pose.theta;
+  dwa_robot_pose.x = my_robot.pos.x*1000;   //単位変換(m ->mm)
+  dwa_robot_pose.y = my_robot.pos.y*1000;   //単位変換(m ->mm)
+  dwa_robot_pose.theta = my_robot.orientation;
+  dwa_robot_vel.x = my_robot.vel[0].x*1000; //単位変換(m/s ->mm/s)
+  dwa_robot_vel.y = my_robot.vel[0].y*1000; //単位変換(m/s ->mm/s)
   //今後戦略版から送信するコマンド
   bool prohidited_zone_ignore = 0;
   bool midle_target_flag = 0;
   //障害物の抽出
   int32_t numOfObstacle = 0;
-  int32_t obs_x[ROBOT_NUM], obs_y[ROBOT_NUM], obs_vx[ROBOT_NUM], obs_vy[ROBOT_NUM], obs_ax[ROBOT_NUM], obs_ay[ROBOT_NUM];
-  TrackedRobot obs_robot[ROBOT_NUM];
+  int32_t obs_x[2*ROBOT_NUM], obs_y[2*ROBOT_NUM], obs_vx[2*ROBOT_NUM], obs_vy[2*ROBOT_NUM], obs_ax[2*ROBOT_NUM], obs_ay[2*ROBOT_NUM];
+  TrackedRobot obs_robot;
   int32_t k = 0;
   for(uint32_t j = 0; j < ROBOT_NUM; j++){
-    if (parser_.extract_robot(j, team_is_yellow_, obs_robot[j]) && j != robot_id){
+    if (parser_.extract_robot(j, team_is_yellow_, obs_robot) && j != robot_id){
       numOfObstacle++;
-      obs_x[k] = obs_robot[j].pos.x;
-      obs_y[k] = obs_robot[j].pos.y;
-      obs_vx[k] = obs_robot[j].vel[0].x;
-      obs_vy[k] = obs_robot[j].vel[0].y;
-      obs_ax[k] = 0;
-      obs_ay[k] = 0;
+      obs_x[k] = obs_robot.pos.x*1000;       //単位変換(m ->mm)
+      obs_y[k] = obs_robot.pos.y*1000;       //単位変換(m ->mm)
+      obs_vx[k] = obs_robot.vel[0].x*1000;   //単位変換(m/s ->mm/s)
+      obs_vy[k] = obs_robot.vel[0].y*1000;   //単位変換(m/s ->mm/s)
+      obs_ax[k] = 0*1000;                       //単位変換(m/s^2 ->mm/s^2)
+      obs_ay[k] = 0*1000;                       //単位変換(m/s^2 ->mm/s^2)
+      k++;
+    }
+    if (parser_.extract_robot(j, !team_is_yellow_, obs_robot)){
+      numOfObstacle++;
+      obs_x[k] = obs_robot.pos.x*1000;       //単位変換(m ->mm)
+      obs_y[k] = obs_robot.pos.y*1000;       //単位変換(m ->mm)
+      obs_vx[k] = obs_robot.vel[0].x*1000;   //単位変換(m/s ->mm/s)
+      obs_vy[k] = obs_robot.vel[0].y*1000;   //単位変換(m/s ->mm/s)
+      obs_ax[k] = 0*1000;                       //単位変換(m/s^2 ->mm/s^2)
+      obs_ay[k] = 0*1000;                       //単位変換(m/s^2 ->mm/s^2)
+      k++;
     }
   }
   //DWAの出力のための変数
@@ -286,36 +309,56 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
   int32_t output_omega;
   int32_t output_ax;
   int32_t output_ay;
-  
-  //DWAの実施
-  execDWA((int32_t) my_robot.pos.x, (int32_t) my_robot.pos.y, (int32_t) my_robot.orientation, (int32_t) my_robot.vel[0].x, (int32_t) my_robot.vel[0].y, (int32_t) my_robot.vel_angular[0], 
-          (int32_t*) &next_goal_pose.x, (int32_t*) &next_goal_pose.y, (int32_t) next_goal_pose.theta, (int32_t*) &midle_target.x, (int32_t*) &midle_target.y,
-          numOfObstacle, obs_x, obs_y, obs_vx, obs_vx, obs_ax, obs_ay, prohidited_zone_ignore, 
+
+  //DWAの実施(単位はmm)
+  execDWA((int32_t) dwa_robot_pose.x, (int32_t) dwa_robot_pose.y, (int32_t) my_robot.orientation, (int32_t) dwa_robot_vel.x, (int32_t) dwa_robot_vel.y, (int32_t) my_robot.vel_angular[0], 
+          (int32_t*) &next_goal_pose.x, (int32_t*) &next_goal_pose.y, (int32_t) next_goal_pose.theta, &midle_target_x, &midle_target_y,
+          numOfObstacle, obs_x, obs_y, obs_vx, obs_vy, obs_ax, obs_ay, prohidited_zone_ignore, 
           &midle_target_flag, &is_enable, &path_enable, &output_vx, &output_vy, &output_omega, &output_ax, &output_ay);
+  RCLCPP_INFO(this->get_logger(),"%d,%d",midle_target_x,midle_target_x);
+  RCLCPP_INFO(this->get_logger(),"%d",midle_target_flag);
+  robot_vertual_vel[robot_id].x = my_robot.vel[0].x*1000;
+  robot_vertual_vel[robot_id].y = my_robot.vel[0].y*1000;
   //DWAの結果を受けてDWAとするか台形制御とするかを判別しロボットの目標値を算出する。
-  robot_vertual_vel[robot_id].x = my_robot.vel[0].x;
-  robot_vertual_vel[robot_id].y = my_robot.vel[0].y;
   if(is_enable == 1 && path_enable == 1){
     //DWAを行う
-    DWA_path_recover((float*) &next_goal_pose.x, (float*) &next_goal_pose.y, (float*) &robot_vertual_vel[robot_id].x, (float*) &robot_vertual_vel[robot_id].x, (float) output_ax, 
-                      (float) output_ay, (float) max_velocity_xy_);
+    for(uint16_t i = 0; i < RASPI_TIME_STEP/MICON_TIME_STEP; i++){
+      DWA_path_recover((float*) &next_goal_pose.x, (float*) &next_goal_pose.y, (float*) &robot_vertual_vel[robot_id].x, (float*) &robot_vertual_vel[robot_id].y, 
+                        (float) output_ax, (float) output_ay, (float) ROBOT_MAX_VEL);
+    }
     trape_controle_flag[robot_id] = 0;
+    RCLCPP_INFO(this->get_logger(),"dwa");
   }
   else if(is_enable == 1 && path_enable == 0){
+    //DWAから台形制御に移行する際に変数を設定する関数
+    trape_controle_flag[robot_id] = micon_trapezoidal_DWA_change((int32_t) dwa_robot_pose.x, (int32_t) dwa_robot_pose.y, (int32_t) robot_vertual_vel[robot_id].x, (int32_t) robot_vertual_vel[robot_id].y, 
+                                                                  &trape_c[robot_id], (int32_t) next_goal_pose.x, (int32_t) next_goal_pose.y, trape_controle_flag[robot_id], 
+                                                                  is_enable, path_enable);
     //台形制御を行う
-    trapezoidal_control((int32_t) next_goal_pose.x, (int32_t) next_goal_pose.y, &trape_c[robot_id]);
+    for(uint16_t i = 0; i < RASPI_TIME_STEP/MICON_TIME_STEP; i++){
+      micon_trapezoidal_control((int32_t) next_goal_pose.x, (int32_t) next_goal_pose.y, &trape_c[robot_id]);
+    }
+    next_goal_pose.x = trape_c[robot_id].virtual_x;
+    next_goal_pose.y = trape_c[robot_id].virtual_y;
+    RCLCPP_INFO(this->get_logger(),"trap");
   }
   else if(is_enable == 0){
     trape_controle_flag[robot_id] = 0;
+    RCLCPP_INFO(this->get_logger(),"corission");
+    double verocity = sqrt(dwa_robot_vel.x*dwa_robot_vel.x + dwa_robot_vel.y*dwa_robot_vel.y);
+    next_goal_pose.x = dwa_robot_pose.x + RASPI_TIME_STEP*dwa_robot_vel.x - 1/2*RASPI_TIME_STEP*RASPI_TIME_STEP*ROBOT_MAX_ACCEL*dwa_robot_vel.x/verocity;
+    next_goal_pose.y = dwa_robot_pose.y + RASPI_TIME_STEP*dwa_robot_vel.y - 1/2*RASPI_TIME_STEP*RASPI_TIME_STEP*ROBOT_MAX_ACCEL*dwa_robot_vel.y/verocity;
   }
+  next_goal_pose.x = next_goal_pose.x/1000;   //単位変換(mm -> m)
+  next_goal_pose.y = next_goal_pose.y/1000;   //単位変換(mm -> m)
   
   //ワールド座標でのロボットの目標速度を計算する
   // ワールド座標系での目標速度を算出
   world_vel.x = pid_vx_[robot_id]->computeCommand(
-    goal_pose.x - my_robot.pos.x,
+    next_goal_pose.x - my_robot.pos.x,
     duration.nanoseconds());
   world_vel.y = pid_vy_[robot_id]->computeCommand(
-    goal_pose.y - my_robot.pos.y,
+    next_goal_pose.y - my_robot.pos.y,
     duration.nanoseconds());
   world_vel.theta =
     pid_vtheta_[robot_id]->computeCommand(

@@ -1,7 +1,7 @@
 #ifndef _TRAPEZOIDALCONTROL_H_
 #define _TRAPEZOIDALCONTROL_H_
 
-#define TRAP_TIME_STEP 0.04
+#define TRAP_TIME_STEP 0.04     //execDWA時に台形制御かDWAかを判断するために使用する
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,6 +41,6 @@ void trapezoidal_control(int32_t targetX, int32_t targetY, trape_con *trape_c);
 void trapezoidal_init(trape_con *trape_c);
 
 #ifdef __cplusplus
-};
+}
 #endif
 #endif // _TRAPEZOIDALCONTROL_H_

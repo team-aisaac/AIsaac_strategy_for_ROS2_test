@@ -20,8 +20,28 @@
 #define FIELD_Y_B 6600
 #define FIELD_OUT_LINE 300  //フィールドの外白線と壁までの距離
 
-#define ROBOT_MAX_VEL 3000;  //ロボットの最大速度(mm/s)
-#define ROBOT_MAX_ACCEL 2000; //ロボットの最大速度(mm/s^2)
+#define ROBOT_MAX_VEL 3000  //ロボットの最大速度(mm/s)
+#define ROBOT_MAX_ACCEL 2000 //ロボットの最大速度(mm/s^2)
+#define ROBOT_MAX_JARK 10000 //ロボットの最大躍度(mm/s^3)
+
+#define MICON_TIME_STEP 0.001          //micon controll time step
+#define RASPI_TIME_STEP 0.01
+
+//ペナルティゾーンのpathのマージン
+#define PENALTY_ZONE_MARGIN_DISTANCE 150      //Margin distance when avoiding obstacles
+//フィールドのペナルティゾーンのマージン設定
+#define PENALTY_MARGIN 3   //mm
+#define PENALTY_OUT_MARGIN 15   //mm
+#define MIDLE_TARGET_MARGIN 50   //mm
+#define PENALTY_MIDLE_TARGET_MARGIN 300   //mm
+//侵入禁止エリアに侵入している際に使うマクロ
+#define MAX_SEARCH_DISTANCE 1000    //侵入禁止エリア外に出るために探索する最大範囲(mm)
+#define DELTA_SEARCH_DISTANCE 100   //侵入禁止エリア外に出るために探索する際の探索幅(mm)
+//フィールドの壁への衝突を回避するときのマージン設定
+#define FIELD_MARGIN 50   //mm
+#define FIELD_TRGET_MARGIN 55   //mm
+
+#define DWA_TRAP_CHANGE_DIS 100  //DWAと台形制御を切り替えるロボットと目標値の距離(mm)
 
 //最大値を算出
 float max_value(float data[], uint16_t size);

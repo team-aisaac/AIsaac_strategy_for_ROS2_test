@@ -1,3 +1,4 @@
+#define _USE_MATH_DEFINES
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -7,29 +8,27 @@
 #include <time.h>
 
 #include "robot_controller/dwa_include/dwa.h"
-#include "robot_controller/tools.h"
 #include "robot_controller/dwa_include/Target_abjust.h"
 #include "robot_controller/dwa_include/RaspiTrapezoidalControl.h"
+#include "robot_controller/tools.h"
 
 //#include "Target_abjust.c"
 //#include "RaspiTrapezoidalControl.c"
 //#include "tools.c"
 
+float robot_max_velo = ROBOT_MAX_VEL;  //ロボットの最大速度(mm/s)
+float robot_max_accel = ROBOT_MAX_ACCEL; //ロボットの最大速度(mm/s^2)
 
+float dwa_x_penalty_line_puls;
+float dwa_x_penalty_line_minus;
+float dwa_y_penalty_line_puls;
+float dwa_y_penalty_line_minus;
+float dwa_x_outside_line_puls;
+float dwa_x_outside_line_minus;
+float dwa_y_outside_line_puls;
+float dwa_y_outside_line_minus;
 
-float robot_max_velo = ROBOT_MAX_VEL  //ロボットの最大速度(mm/s)
-float robot_max_accel = ROBOT_MAX_ACCEL //ロボットの最大速度(mm/s^2)
-
-float x_penalty_line_puls;
-float x_penalty_line_minus;
-float y_penalty_line_puls;
-float y_penalty_line_minus;
-float x_outside_line_puls;
-float x_outside_line_minus;
-float y_outside_line_puls;
-float y_outside_line_minus;
-
-float timestep_reciprocal = 1 / TIME_STEP;
+float timestep_reciprocal = 1 / DWA_CAL_TIME_STEP;
 
 //ロボットの軌道予測(long path用)
 void predict_robot_long_path(int32_t x, int32_t y, int32_t theta, int32_t Vx, int32_t Vy, int32_t omega,
@@ -41,10 +40,10 @@ void predict_robot_long_path(int32_t x, int32_t y, int32_t theta, int32_t Vx, in
     float vy = Vy;
     for (uint32_t i = 0; i < long_path_predict_step; i++)
     {
-        temp_x = vx * TIME_STEP + 0.5 * accel_x * TIME_STEP * TIME_STEP + temp_x;
-        temp_y = vy * TIME_STEP + 0.5 * accel_y * TIME_STEP * TIME_STEP + temp_y;
-        vx = vx + accel_x * TIME_STEP;
-        vy = vy + accel_y * TIME_STEP;
+        temp_x = vx * DWA_CAL_TIME_STEP + 0.5 * accel_x * DWA_CAL_TIME_STEP * DWA_CAL_TIME_STEP + temp_x;
+        temp_y = vy * DWA_CAL_TIME_STEP + 0.5 * accel_y * DWA_CAL_TIME_STEP * DWA_CAL_TIME_STEP + temp_y;
+        vx = vx + accel_x * DWA_CAL_TIME_STEP;
+        vy = vy + accel_y * DWA_CAL_TIME_STEP;
         float v_cof = robot_max_velo / sqrtf(vx * vx + vy * vy);
         if (v_cof < 1)
         {
@@ -69,10 +68,10 @@ void predict_robot_fine_path(int32_t x, int32_t y, int32_t theta, int32_t Vx, in
     float vy = Vy;
     for (uint32_t i = 0; i < fine_path_predict_step; i++)
     {
-        temp_x = vx * TIME_STEP + 0.5 * accel_x * TIME_STEP * TIME_STEP + temp_x;
-        temp_y = vy * TIME_STEP + 0.5 * accel_y * TIME_STEP * TIME_STEP + temp_y;
-        vx = vx + accel_x * TIME_STEP;
-        vy = vy + accel_y * TIME_STEP;
+        temp_x = vx * DWA_CAL_TIME_STEP + 0.5 * accel_x * DWA_CAL_TIME_STEP * DWA_CAL_TIME_STEP + temp_x;
+        temp_y = vy * DWA_CAL_TIME_STEP + 0.5 * accel_y * DWA_CAL_TIME_STEP * DWA_CAL_TIME_STEP + temp_y;
+        vx = vx + accel_x * DWA_CAL_TIME_STEP;
+        vy = vy + accel_y * DWA_CAL_TIME_STEP;
         float v_cof = robot_max_velo / sqrtf(vx * vx + vy * vy);
         if (v_cof < 1)
         {
@@ -140,8 +139,8 @@ void execDWA(int32_t x, int32_t y, int32_t theta, int32_t Vx, int32_t Vy, int32_
              bool *is_enable, bool *path_enable, int32_t *output_vx, int32_t *output_vy, int32_t *output_omega, int32_t *output_ax, int32_t *output_ay)
 {
     //フィールドデータの代入
-    field_data(&x_penalty_line_puls, &x_penalty_line_minus, &y_penalty_line_puls, &y_penalty_line_minus, &x_outside_line_puls,
-               &x_outside_line_minus, &y_outside_line_puls, &y_outside_line_minus);
+    field_data(&dwa_x_penalty_line_puls, &dwa_x_penalty_line_minus, &dwa_y_penalty_line_puls, &dwa_y_penalty_line_minus, &dwa_x_outside_line_puls,
+               &dwa_x_outside_line_minus, &dwa_y_outside_line_puls, &dwa_y_outside_line_minus);
     //フィールド外の目標値やペナルティゾーン内の目標値を適正な箇所に設置し直す
     bool prohidited_zone_start = 0;
     *midle_target_flag = target_abjust(x, y, targetX, targetY, midle_targetX, midle_targetY, prohidited_zone_ignore, &prohidited_zone_start);
@@ -781,7 +780,7 @@ float obstacle(float path_x[], float path_y[], uint16_t size, int16_t obs_size, 
                 {
                     for (int k = 0; k < cal_step_devide; k++)
                     {
-                        float time = TIME_STEP * (i + k / cal_step_devide);
+                        float time = DWA_CAL_TIME_STEP * (i + k / cal_step_devide);
                         //障害物のロボットの位置計算
                         float obs_x = obs_imfo[j].x + obs_imfo[j].vx * time + 0.5 * obs_imfo[j].ax * time * time;
                         float obs_y = obs_imfo[j].y + obs_imfo[j].vy * time + 0.5 * obs_imfo[j].ay * time * time;
@@ -845,6 +844,9 @@ bool path_enable_check(int32_t x, int32_t y, int32_t Vx, int32_t Vy, int32_t tar
     {
         accel = sqrtf(output_ax * output_ax + output_ay * output_ay);
     }
+    if(distance < DWA_TRAP_CHANGE_DIS){
+        path_enable = 0;
+    }
     float predict_distance = (2 * velocity - accel * (float)fine_path_predict_step * 0.1) * ((float)fine_path_predict_step * 0.1) * 0.5;
     if (distance != 0 && accel != 0)
     {
@@ -874,10 +876,6 @@ bool path_enable_check(int32_t x, int32_t y, int32_t Vx, int32_t Vy, int32_t tar
         if ((-deg_change <= vel_accel_diff_deg && vel_accel_diff_deg <= deg_change) || vel_accel_diff_deg <= -180 + deg_change || 180 - deg_change <= vel_accel_diff_deg)
         {
             path_enable = 0;
-        }
-        else
-        {
-            path_enable = 1;
         }
     }
     //速度が遅い場合は台形制御をする
@@ -944,7 +942,7 @@ void field_out_penalty_zone_long_path_check(path_long_prediction *long_predictio
     {
         for (int k = 0; k < long_path_predict_step; k++)
         {
-            if (field_penalty_zone_check(long_prediction[i].x[k], long_prediction[i].y[k], prohidited_zone_ignore, x_penalty_line_puls, x_penalty_line_minus, y_penalty_line_puls, y_penalty_line_minus) == 1 && prohidited_zone_start == 0)
+            if (field_penalty_zone_check(long_prediction[i].x[k], long_prediction[i].y[k], prohidited_zone_ignore, dwa_x_penalty_line_puls, dwa_x_penalty_line_minus, dwa_y_penalty_line_puls, dwa_y_penalty_line_minus) == 1 && prohidited_zone_start == 0)
             {
                 long_prediction[i].availability_flag = 1;
                 break;
@@ -959,7 +957,7 @@ void field_out_penalty_zone_fine_path_check(path_fine_prediction *fine_predictio
     {
         for (int k = 0; k < fine_path_predict_step; k++)
         {
-            if (field_penalty_zone_check(fine_prediction[i].x[k], fine_prediction[i].y[k], prohidited_zone_ignore, x_penalty_line_puls, x_penalty_line_minus, y_penalty_line_puls, y_penalty_line_minus) == 1 && prohidited_zone_start == 0)
+            if (field_penalty_zone_check(fine_prediction[i].x[k], fine_prediction[i].y[k], prohidited_zone_ignore, dwa_x_penalty_line_puls, dwa_x_penalty_line_minus, dwa_y_penalty_line_puls, dwa_y_penalty_line_minus) == 1 && prohidited_zone_start == 0)
             {
                 fine_prediction[i].availability_flag = 1;
                 break;
@@ -984,25 +982,25 @@ void avoid_field_wall_collision(int32_t x, int32_t y, int32_t theta, int32_t Vx,
 {
     float x_stop = (float)x + *opt_path->vx * *opt_path->vx * *opt_path->vx / (2 * robot_max_accel * fabs(*opt_path->vx));
     float y_stop = (float)y + *opt_path->vy * *opt_path->vy * *opt_path->vy / (2 * robot_max_accel * fabs(*opt_path->vy));
-    if (x_stop <= x_outside_line_minus - FIELD_OUT_LINE + ROBOT_SIZE * 0.5 + FIELD_MARGIN)
+    if (x_stop <= dwa_x_outside_line_minus - FIELD_OUT_LINE + ROBOT_SIZE * 0.5 + FIELD_MARGIN)
     {
         opt_path->accel_derection = 0;
         opt_path->accel = robot_max_accel;
         *collision_flag = 1;
     }
-    else if (x_outside_line_puls + FIELD_OUT_LINE - ROBOT_SIZE * 0.5 - FIELD_MARGIN <= x_stop)
+    else if (dwa_x_outside_line_puls + FIELD_OUT_LINE - ROBOT_SIZE * 0.5 - FIELD_MARGIN <= x_stop)
     {
         opt_path->accel_derection = 180;
         opt_path->accel = robot_max_accel;
         *collision_flag = 1;
     }
-    if (y_stop <= y_outside_line_minus - FIELD_OUT_LINE + ROBOT_SIZE * 0.5 + FIELD_MARGIN)
+    if (y_stop <= dwa_y_outside_line_minus - FIELD_OUT_LINE + ROBOT_SIZE * 0.5 + FIELD_MARGIN)
     {
         opt_path->accel_derection = 90;
         opt_path->accel = robot_max_accel;
         *collision_flag = 1;
     }
-    else if (y_outside_line_puls + FIELD_OUT_LINE - ROBOT_SIZE * 0.5 - FIELD_MARGIN <= y_stop)
+    else if (dwa_y_outside_line_puls + FIELD_OUT_LINE - ROBOT_SIZE * 0.5 - FIELD_MARGIN <= y_stop)
     {
         opt_path->accel_derection = 270;
         opt_path->accel = robot_max_accel;

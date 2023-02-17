@@ -1,8 +1,9 @@
 #ifndef _TRAPEZOIDALCONTROL_H_
 #define _TRAPEZOIDALCONTROL_H_
 
-#define MICON_TIME_STEP 0.001          //controll time step
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 //構造体
 //ロボットの状態を保存する構造体
 /*テスト用の構造体
@@ -34,11 +35,14 @@ typedef struct{
 // 関数のプロトタイプ宣言
 //DWAと台形制御の切り替え判定 0:DWAを使用,1:台形制御を使用
 bool micon_trapezoidal_DWA_change(int32_t x, int32_t y, int32_t vx, int32_t vy, micon_trape_con *trape_c, int32_t targetX, int32_t targetY, 
-                            float ax, float ay, bool trape_c_flag, bool dwa_enable_flag, bool dwa_pathe_enable_flag);
+                                    bool trape_c_flag, bool dwa_enable_flag, bool dwa_pathe_enable_flag);
+int8_t micon_jerk_flag_check(float distance, float braking_distance);
 //台形制御
 void micon_trapezoidal_control(int32_t targetX, int32_t targetY, micon_trape_con *trape_c);
 //台形制御の係数初期化
 void micon_trapezoidal_init(micon_trape_con *trape_c);
 
-
+#ifdef __cplusplus
+}
+#endif
 #endif // _TRAPEZOIDALCONTROL_H_

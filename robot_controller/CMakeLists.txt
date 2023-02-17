@@ -32,6 +32,13 @@ add_library(controller_component SHARED
   src/controller_component.cpp
   src/field_info_parser.cpp
   src/geometry_tools.cpp
+  #dwa
+  src/dwa_src/dwa2.c
+  src/dwa_src/Target_abjust.c
+  src/dwa_src/RaspiTrapezoidalControl.c
+  src/dwa_src/TrapezoidalControl.c
+  src/dwa_src/DWA_path_recover.c
+  src/tools.c
 )
 target_compile_definitions(controller_component
   PRIVATE "ROBOT_CONTROLLER_BUILDING_DLL")
