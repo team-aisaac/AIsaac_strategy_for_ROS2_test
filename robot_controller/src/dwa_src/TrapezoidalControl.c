@@ -9,6 +9,9 @@
 
 #include <time.h>
 
+#include "/opt/ros/foxy/include/rcutils/logging_macros.h"
+#include "/opt/ros/foxy/include/rcutils/logging.h"
+
 //int test_time_step = 0;
 
 bool micon_trapezoidal_DWA_change(int32_t x, int32_t y, int32_t vx, int32_t vy, micon_trape_con *trape_c, int32_t targetX, int32_t targetY, 
@@ -184,6 +187,17 @@ void micon_trapezoidal_init(micon_trape_con *trape_c){
     trape_c->virtual_y = 0;
 }
 
+void micon_trapezoidal_robotXY_vertualXY_distance_check(micon_trape_con *trape_c, int32_t x, int32_t y){
+    float distance = 0;
+    if(0 < (trape_c->virtual_x - x)*(trape_c->virtual_x - x) + (trape_c->virtual_y - y)*(trape_c->virtual_y - y)){
+        distance = sqrt((trape_c->virtual_x - x)*(trape_c->virtual_x - x) + (trape_c->virtual_y - y)*(trape_c->virtual_y - y));
+        if(TRAPE_ROBOTXY_VIRUALXY_DISTANCE_CHECK < distance){
+            RCUTILS_LOG_INFO("checkcheckcheckcheckcheckcheckcheckcheckcheckcheck");
+            trape_c->virtual_x = x + TRAPE_ROBOTXY_VIRUALXY_DISTANCE_CHECK*(trape_c->virtual_x - x)/distance;
+            trape_c->virtual_x = y + TRAPE_ROBOTXY_VIRUALXY_DISTANCE_CHECK*(trape_c->virtual_y - y)/distance;
+        }
+    }
+}
 /*
 int main(void) {
     printf("start.\n");

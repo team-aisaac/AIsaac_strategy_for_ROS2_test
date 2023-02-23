@@ -43,6 +43,8 @@
 
 #define DWA_TRAP_CHANGE_DIS 100  //DWAと台形制御を切り替えるロボットと目標値の距離(mm)
 
+#define TRAPE_ROBOTXY_VIRUALXY_DISTANCE_CHECK 1000   //台形制御中に仮の目標値とロボットの位置が離れられる最大値
+
 //最大値を算出
 float max_value(float data[], uint16_t size);
 //最小値を算出

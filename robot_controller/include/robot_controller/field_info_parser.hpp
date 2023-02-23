@@ -53,7 +53,6 @@ class FieldInfoParser
 {
 public:
   FieldInfoParser();
-  //↑オーバーロードするとノードの起動に失敗する（原因不明）
   void set_invert(const bool & invert);
   void set_team_is_yellow(const bool & team_is_yellow);
   void set_detection_tracked(const TrackedFrame::SharedPtr detection_tracked);

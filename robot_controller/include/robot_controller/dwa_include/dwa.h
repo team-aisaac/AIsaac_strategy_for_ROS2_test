@@ -60,7 +60,9 @@ typedef struct{
     int32_t targetX;
     int32_t targetY;
     int32_t targetTheta;
-} robot_state;
+    int32_t midle_targetX;
+    int32_t midle_targetY;
+} dwa_robot_state;
 //1度目の長い時間を予測する時のpath
 typedef struct{
 	float x[PREDICT_LONG_STEP];		//(mm)

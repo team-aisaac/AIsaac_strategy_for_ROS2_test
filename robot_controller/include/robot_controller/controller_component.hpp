@@ -22,6 +22,8 @@
 
 //#include "robot_controller/dwa_include/RaspiTrapezoidalControl.h"
 #include "robot_controller/dwa_include/TrapezoidalControl.h"
+#include "robot_controller/dwa_include/dwa.h"
+#include "robot_controller/dwa_include/DWA_path_recover.h"
 
 namespace robot_controller
 {
@@ -106,6 +108,12 @@ private:
   //DWAと台形制御用の変数
   std::vector<bool> trape_controle_flag;          //前回のループで台形制御を行っていたかを判定するフラグ
   std::vector<micon_trape_con> trape_c;                 //台形制御を行うための構造体 
+  std::vector<int8_t> pose_controll_count;        //DWAを100msごとに起動するためのカウンタ
+  std::vector<State> next_goal_pose;
+  void decide_next_goal_xy(State goal_pose, State &midle_goal_pose, State &next_goal_pose, bool prohidited_zone_ignore, bool &midle_target_flag, 
+    const unsigned int robot_id, TrackedRobot my_robot, bool team_is_yellow_, std::vector<bool> &trape_controle_flag, std::vector<micon_trape_con> &trape_c, 
+    bool &control_vel);
+  std::vector<dwa_robot_path> dwa_robot;
 };
 
 }  // namespace robot_controller

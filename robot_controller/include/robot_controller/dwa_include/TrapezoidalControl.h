@@ -41,6 +41,8 @@ int8_t micon_jerk_flag_check(float distance, float braking_distance);
 void micon_trapezoidal_control(int32_t targetX, int32_t targetY, micon_trape_con *trape_c);
 //台形制御の係数初期化
 void micon_trapezoidal_init(micon_trape_con *trape_c);
+//台形制御時にロボットと仮想目標値が離れすぎた場合に補正するための関数
+void micon_trapezoidal_robotXY_vertualXY_distance_check(micon_trape_con *trape_c, int32_t x, int32_t y);
 
 #ifdef __cplusplus
 }

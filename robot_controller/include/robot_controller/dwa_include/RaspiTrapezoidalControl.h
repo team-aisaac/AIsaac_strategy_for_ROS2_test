@@ -1,5 +1,5 @@
-#ifndef _TRAPEZOIDALCONTROL_H_
-#define _TRAPEZOIDALCONTROL_H_
+#ifndef _RSPI_TRAPEZOIDALCONTROL_H_
+#define _RSPI_TRAPEZOIDALCONTROL_H_
 
 #define TRAP_TIME_STEP 0.04     //execDWA時に台形制御かDWAかを判断するために使用する
 
@@ -43,4 +43,4 @@ void trapezoidal_init(trape_con *trape_c);
 #ifdef __cplusplus
 }
 #endif
-#endif // _TRAPEZOIDALCONTROL_H_
+#endif // _RSPI_TRAPEZOIDALCONTROL_H_

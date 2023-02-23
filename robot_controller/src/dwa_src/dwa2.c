@@ -12,6 +12,9 @@
 #include "robot_controller/dwa_include/RaspiTrapezoidalControl.h"
 #include "robot_controller/tools.h"
 
+#include "/opt/ros/foxy/include/rcutils/logging_macros.h"
+#include "/opt/ros/foxy/include/rcutils/logging.h"
+
 //#include "Target_abjust.c"
 //#include "RaspiTrapezoidalControl.c"
 //#include "tools.c"
@@ -144,6 +147,7 @@ void execDWA(int32_t x, int32_t y, int32_t theta, int32_t Vx, int32_t Vy, int32_
     //フィールド外の目標値やペナルティゾーン内の目標値を適正な箇所に設置し直す
     bool prohidited_zone_start = 0;
     *midle_target_flag = target_abjust(x, y, targetX, targetY, midle_targetX, midle_targetY, prohidited_zone_ignore, &prohidited_zone_start);
+    //RCUTILS_LOG_INFO("midle_target_flag: %d,prohidited_zone_ignore: %d",*midle_target_flag, prohidited_zone_ignore);
     //現在距離と目標値から予測時間を算出
     float distance = cal_robot_target_distance(x, y, *targetX, *targetY, *midle_targetX, *midle_targetY, *midle_target_flag);
     uint32_t long_path_predict_step;                                                  // long pathの予想ステップ数
