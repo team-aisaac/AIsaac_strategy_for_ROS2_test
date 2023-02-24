@@ -1,13 +1,13 @@
-vx_p: 5.0   # 3.0
+vx_p: 6.0   # 3.0
 vx_i: 0.0
-vx_d: 0.7     #0.7
+vx_d: 1.0     #0.7
 vx_i_max: 0.0
 vx_i_min: 0.0
 vx_antiwindup: false
 
-vy_p: 5.0
+vy_p: 6.0
 vy_i: 0.0
-vy_d: 0.7
+vy_d: 1.0
 vy_i_max: 0.0
 vy_i_min: 0.0
 vy_antiwindup: false

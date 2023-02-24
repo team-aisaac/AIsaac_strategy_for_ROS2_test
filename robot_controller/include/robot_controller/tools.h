@@ -20,7 +20,7 @@
 #define FIELD_Y_B 6600
 #define FIELD_OUT_LINE 300  //フィールドの外白線と壁までの距離
 
-#define ROBOT_MAX_VEL 3000  //ロボットの最大速度(mm/s)
+#define ROBOT_MAX_VEL 2000  //ロボットの最大速度(mm/s)
 #define ROBOT_MAX_ACCEL 2000 //ロボットの最大速度(mm/s^2)
 #define ROBOT_MAX_JARK 10000 //ロボットの最大躍度(mm/s^3)
 
@@ -43,7 +43,9 @@
 
 #define DWA_TRAP_CHANGE_DIS 100  //DWAと台形制御を切り替えるロボットと目標値の距離(mm)
 
-#define TRAPE_ROBOTXY_VIRUALXY_DISTANCE_CHECK 1000   //台形制御中に仮の目標値とロボットの位置が離れられる最大値
+#define DWA_ROBOTXY_VIRUALXY_DISTANCE_CHECK 500   //DWA中に仮の目標値とロボットの位置が離れられる最大値
+#define TRAPE_ROBOTXY_VIRUALXY_DISTANCE_CHECK 600   //台形制御中に仮の目標値とロボットの位置が離れられる最大値
+#define ROBOT_POSITION_RESET_DISTANCE 700         //ロボットの現在地と仮想目標値が大きく離れすぎた場合に現在地等をリセットする閾値となる距離
 
 //最大値を算出
 float max_value(float data[], uint16_t size);
