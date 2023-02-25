@@ -111,9 +111,12 @@ private:
   std::vector<int8_t> pose_controll_count;        //DWAを100msごとに起動するためのカウンタ
   std::vector<State> next_goal_pose;
   void decide_next_goal_xy(State goal_pose, State &midle_goal_pose, State &next_goal_pose, bool prohidited_zone_ignore, bool &midle_target_flag, 
-    const unsigned int robot_id, TrackedRobot my_robot, bool team_is_yellow_, std::vector<bool> &trape_controle_flag, std::vector<micon_trape_con> &trape_c, 
-    bool &control_vel);
+    const unsigned int robot_id, TrackedRobot my_robot, bool team_is_yellow_, std::vector<bool> &trape_controle_flag, std::vector<micon_trape_con> &trape_c);
   std::vector<dwa_robot_path> dwa_robot;
+
+  //ボールを蹴る
+  TrackedBall ball;
+    void decide_kick_xy(TrackedBall ball, State ball_goal, TrackedRobot my_robot);
 };
 
 }  // namespace robot_controller

@@ -38,6 +38,8 @@ add_library(controller_component SHARED
   src/dwa_src/RaspiTrapezoidalControl.c
   src/dwa_src/TrapezoidalControl.c
   src/dwa_src/DWA_path_recover.c
+  #ball kick
+  src/ball_wrap_kick_src/wrap_kick.c
   src/tools.c
 )
 target_compile_definitions(controller_component

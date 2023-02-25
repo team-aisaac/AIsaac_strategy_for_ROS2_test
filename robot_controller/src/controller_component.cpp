@@ -9,12 +9,15 @@
 #include "robot_controller/controller_component.hpp"
 #include "robot_controller/geometry_tools.hpp"
 #include "rclcpp/rclcpp.hpp"
-
+//dwa
 #include "robot_controller/dwa_include/dwa.h"
 #include "robot_controller/dwa_include/Target_abjust.h"
 #include "robot_controller/dwa_include/DWA_path_recover.h"
 #include "robot_controller/dwa_include/RaspiTrapezoidalControl.h"
 #include "robot_controller/dwa_include/TrapezoidalControl.h"
+//ball kick
+#include "robot_controller/ball_wrap_kick_include/wrap_kick.h"
+//マイコン・ラズパイ共有ライブラリ
 #include "robot_controller/tools.h"
 
 namespace robot_controller
@@ -250,6 +253,10 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
     return;
   }
 
+  //ボール情報を取得
+  parser_.extract_ball(ball);
+  RCLCPP_INFO(rclcpp::get_logger("ball"),"x : %f, y : %f, z : %f", ball.pos.x, ball.pos.y, ball.pos.z);
+
   //ロボットを制御する
   //変数の初期化
   double kick_power = 0.0;
@@ -260,12 +267,8 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
       goal_handle_[robot_id]->get_goal(), my_robot, goal_pose, kick_power,
       dribble_power);
   }
-  auto current_time = steady_clock_.now();
-  auto duration = current_time - last_update_time_[robot_id];
   State world_vel;
   //指示の種類を識別する
-  //パターン1：目標値に到達するだけの場合
-  //次のループまでの目標値(x ,y, theta)を計算する
   //今後戦略版から送信するコマンド
   //仮の目標値設定
   goal_pose.x = 0;
@@ -273,24 +276,25 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
   goal_pose.theta = 0;
   bool prohidited_zone_ignore = 0;
   bool midle_target_flag = 0;
-  bool control_vel = 0;
   State midle_goal_pose;
   State next_goal_pose;   //次のループまでのゴール座標(DWAや台形制御を用いて計算される目標値)
+
+  //ボールを蹴る動作を前提とする場合の処理
+
+  //算出された目標点まで移動するために、次のループまでの目標点を決定する
   decide_next_goal_xy(goal_pose, midle_goal_pose, next_goal_pose, prohidited_zone_ignore, midle_target_flag, 
-    robot_id, my_robot, team_is_yellow_, trape_controle_flag, trape_c, control_vel);
+    robot_id, my_robot, team_is_yellow_, trape_controle_flag, trape_c);
   //RCLCPP_INFO(rclcpp::get_logger("dwa"),"next_x:%lf,next_y:%lf",next_goal_pose.x, next_goal_pose.y);
-  if(control_vel == 0){
-    world_vel.x = pid_vx_[robot_id]->computeCommand(
-      next_goal_pose.x - my_robot.pos.x,
-      duration.nanoseconds());
-    world_vel.y = pid_vy_[robot_id]->computeCommand(
-      next_goal_pose.y - my_robot.pos.y,
-      duration.nanoseconds());
-  }
-  else{
-    world_vel.x = next_goal_pose.x;
-    world_vel.y = next_goal_pose.y;
-  }
+  //PID制御のための時間計測
+  auto current_time = steady_clock_.now();
+  auto duration = current_time - last_update_time_[robot_id];
+  //PID制御を行う
+  world_vel.x = pid_vx_[robot_id]->computeCommand(
+    next_goal_pose.x - my_robot.pos.x,
+    duration.nanoseconds());
+  world_vel.y = pid_vy_[robot_id]->computeCommand(
+    next_goal_pose.y - my_robot.pos.y,
+    duration.nanoseconds());
   world_vel.theta =
     pid_vtheta_[robot_id]->computeCommand(
     tools::normalize_theta(
@@ -503,8 +507,7 @@ State Controller::limit_world_acceleration(
 }
 
 void Controller::decide_next_goal_xy(State goal_pose, State &midle_goal_pose, State &next_goal_pose, bool prohidited_zone_ignore, bool &midle_target_flag, 
-    const unsigned int robot_id, TrackedRobot my_robot, bool team_is_yellow_, std::vector<bool> &trape_controle_flag, std::vector<micon_trape_con> &trape_c, 
-    bool &control_vel)
+    const unsigned int robot_id, TrackedRobot my_robot, bool team_is_yellow_, std::vector<bool> &trape_controle_flag, std::vector<micon_trape_con> &trape_c)
 {
     dwa_robot[robot_id].targetX = goal_pose.x*1000;   //単位変換(m ->mm)
     dwa_robot[robot_id].targetY = goal_pose.y*1000;   //単位変換(m ->mm)
