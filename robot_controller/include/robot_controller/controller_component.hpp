@@ -25,6 +25,8 @@
 #include "robot_controller/dwa_include/dwa.h"
 #include "robot_controller/dwa_include/DWA_path_recover.h"
 
+#include "robot_controller/ball_wrap_kick_include/wrap_kick.h"
+
 namespace robot_controller
 {
 using GoalPose = consai_msgs::msg::GoalPose;
@@ -115,8 +117,11 @@ private:
   std::vector<dwa_robot_path> dwa_robot;
 
   //ボールを蹴る
+  std::vector<bool> ball_kick_con_flag;               //前回ループでボールを蹴る動作に入っていたかを確認するフラグ
   TrackedBall ball;
-    void decide_kick_xy(TrackedBall ball, State ball_goal, TrackedRobot my_robot);
+  void decide_kick_xy(TrackedBall ball, State r_ball, State ball_goal, TrackedRobot my_robot, bool& ball_kick, std::vector<bool> &ball_kick_con_flag, 
+    const unsigned int robot_id);
+  std::vector<kick_path> kick_con_path;
 };
 
 }  // namespace robot_controller

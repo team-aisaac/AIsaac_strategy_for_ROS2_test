@@ -2,6 +2,7 @@
 #define _TOOLS_H_
 
 #define ROBOT_SIZE 180            //robot size(diameter mm)
+#define BALL_DIAMETER 46          //ball diameter(mm)
 
 #define DEG_TO_RAD 0.0174532925199
 #define RAD_TO_DEG 57.29577951
@@ -46,6 +47,9 @@
 #define DWA_ROBOTXY_VIRUALXY_DISTANCE_CHECK 500   //DWA中に仮の目標値とロボットの位置が離れられる最大値
 #define TRAPE_ROBOTXY_VIRUALXY_DISTANCE_CHECK 600   //台形制御中に仮の目標値とロボットの位置が離れられる最大値
 #define ROBOT_POSITION_RESET_DISTANCE 700         //ロボットの現在地と仮想目標値が大きく離れすぎた場合に現在地等をリセットする閾値となる距離
+
+#define WRAP_KICK_CONTROL_CHANGE_DISTANCE 100   //ボールに対する回り込み動作を行う最大のロボットとボールの距離
+#define ROBOT_KICK_ENABLE_X 85
 
 //最大値を算出
 float max_value(float data[], uint16_t size);

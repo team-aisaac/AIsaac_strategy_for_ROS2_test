@@ -84,6 +84,8 @@ Controller::Controller(const rclcpp::NodeOptions & options)
     trape_c.push_back(micon_trape_con());             //台形制御を行うための構造体 
     micon_trapezoidal_init(&trape_c[i]);              //台形制御を行うための構造体の初期化
     dwa_robot.push_back(dwa_robot_path());            //DWAを使用するための構造体
+    ball_kick_con_flag.push_back(false);              //ロボットがキックを行うための制御を行っているかを判定するフラグ
+    kick_con_path.push_back(kick_path());                 //ロボットがキックを行うための制御を行うための経路
     dwa_robot[i].x = 0;
     dwa_robot[i].y = 0;
     dwa_robot[i].theta = 0;
@@ -255,7 +257,6 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
 
   //ボール情報を取得
   parser_.extract_ball(ball);
-  RCLCPP_INFO(rclcpp::get_logger("ball"),"x : %f, y : %f, z : %f", ball.pos.x, ball.pos.y, ball.pos.z);
 
   //ロボットを制御する
   //変数の初期化
@@ -278,8 +279,25 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
   bool midle_target_flag = 0;
   State midle_goal_pose;
   State next_goal_pose;   //次のループまでのゴール座標(DWAや台形制御を用いて計算される目標値)
+  bool ball_kick = 0;
+  bool ball_kick_state = 1;
+  State ball_goal;        //ボールを蹴る際の目標地点
+  State r_ball;        //ボールを蹴る際の目標地点
 
   //ボールを蹴る動作を前提とする場合の処理
+  r_ball.x = (ball.pos.x - my_robot.pos.x)*cosf(-my_robot.orientation) - (ball.pos.y - my_robot.pos.y)*sinf(-my_robot.orientation);
+  r_ball.y = (ball.pos.x - my_robot.pos.x)*sinf(-my_robot.orientation) + (ball.pos.y - my_robot.pos.y)*cosf(-my_robot.orientation);  
+  //ボールセンサに反応するかを判定(ロボットに実装する場合はボールセンサでボールの位置が取れるかで判定する)
+  if(((-0.06 <= r_ball.y && r_ball.y <= 0.06) && (0.08 <= r_ball.x && r_ball.x <= 0.13)) || ball_kick_con_flag[robot_id] == 1){
+    //ボールセンサに反応だないときはカメラの情報、ボールセンサが反応しているときはその値を使用する
+    if(ball_kick_state){  //ボールを蹴るための位置移動を行うかを判定(戦略PCから送信)
+      decide_kick_xy(ball, r_ball, ball_goal, my_robot, ball_kick, ball_kick_con_flag, robot_id);
+      if(ball_kick){      //ボールを蹴る処理を実行(戦略PCから送信)
+        command_msg->kick_power = kick_power;
+        ball_kick_con_flag[robot_id] = 0;
+      }
+    }
+  }
 
   //算出された目標点まで移動するために、次のループまでの目標点を決定する
   decide_next_goal_xy(goal_pose, midle_goal_pose, next_goal_pose, prohidited_zone_ignore, midle_target_flag, 
@@ -325,8 +343,6 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
   
   last_update_time_[robot_id] = current_time;
   last_world_vel_[robot_id] = world_vel;
-
-  command_msg->kick_power = 6.0;
 
   // 制御値を出力する
   pub_command_[robot_id]->publish(std::move(command_msg));
@@ -504,6 +520,34 @@ State Controller::limit_world_acceleration(
   modified_velocity.y = last_velocity.y + acc.y * dt.seconds();
   modified_velocity.theta = last_velocity.theta + acc.theta * dt.seconds();
   return modified_velocity;
+}
+
+void Controller::decide_kick_xy(TrackedBall ball, State r_ball, State ball_goal, TrackedRobot my_robot, bool &ball_kick, std::vector<bool> &ball_kick_con_flag,
+  const unsigned int robot_id){
+  int32_t w_robot_x = my_robot.pos.x*1000;          //m->mm
+  int32_t w_robot_y = my_robot.pos.y*1000;          //m->mm
+  int32_t w_robot_theta = 1000 * RAD_TO_DEG * my_robot.orientation;
+  int32_t w_ball_x = ball.pos.x * 1000;             //m->mm
+  int32_t w_ball_y = ball.pos.y * 1000;             //m->mm
+  int32_t r_ball_x = r_ball.x * 1000;             //m->mm
+  int32_t r_ball_y = r_ball.y * 1000;             //m->mm
+  int32_t target_ball_x = ball_goal.x*1000;         //m->mm
+  int32_t target_ball_y = ball_goal.y*1000;         //m->mm
+  int32_t robot_goal_x, robot_goal_y, robot_goal_theta;
+  if(ball_kick_con_flag[robot_id] == 1){//ボールを蹴る制御に入るときに各変数を格納する
+  /*
+    wrap_kick_control_start(&kick_con_path[robot_id], w_robot_x, w_robot_y, w_robot_theta, 
+    w_robot_vx, w_robot_vy, w_robot_omega);*/
+  }
+  wrap_kick(w_robot_x, w_robot_y, w_robot_theta, w_ball_x, w_ball_y, target_ball_x, target_ball_y, r_ball_x, r_ball_y,
+            &robot_goal_x, &robot_goal_y, &robot_goal_theta);
+  float ball_robot_distance = std::hypot(w_robot_x - w_ball_x, w_robot_y - w_ball_y);
+  if(WRAP_KICK_CONTROL_CHANGE_DISTANCE < ball_robot_distance){
+    ball_kick_con_flag[robot_id] = 0;
+  }else{
+    ball_kick_con_flag[robot_id] = 1;
+  }
+  //RCLCPP_INFO(rclcpp::get_logger("ball"),"x : %f, y : %f, z : %f", ball.pos.x, ball.pos.y, ball.pos.z);
 }
 
 void Controller::decide_next_goal_xy(State goal_pose, State &midle_goal_pose, State &next_goal_pose, bool prohidited_zone_ignore, bool &midle_target_flag, 
