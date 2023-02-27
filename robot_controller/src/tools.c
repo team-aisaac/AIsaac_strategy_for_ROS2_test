@@ -107,3 +107,23 @@ float modifid_acosf(float value){
     }
     return acosf(value);
 }
+//-1~1で数字をラップする(float等で計算した場合わずかに超えたりする.asinfの引数などに使用)
+float modifid_asinf(float value){
+        if(1.0 < value){
+        return asinf(1.0);
+    }
+    if(value < -1.0){
+        return asinf(-1.0);
+    }
+    return asinf(value);
+}
+//ワールド座標系をロボット座標系に変更する関数
+void w_to_r_coordinate_chang(float w_x, float w_y, float *r_x, float *r_y, float w_robot_x, float w_robot_y, float w_robot_theta){
+    *r_x = (w_x - w_robot_x)*cosf(-w_robot_theta) - (w_y - w_robot_y)*sinf(-w_robot_theta);
+    *r_y = (w_x - w_robot_x)*sinf(-w_robot_theta) + (w_y - w_robot_y)*cosf(-w_robot_theta);
+}
+void r_to_w_coordinate_chang(float *w_x, float *w_y, float r_x, float r_y, float w_robot_x, float w_robot_y, float w_robot_theta){
+    *w_x = r_x*cosf(w_robot_theta) - r_y*sinf(w_robot_theta) + w_robot_x;
+    *w_y = r_x*sinf(w_robot_theta) + r_y*cosf(w_robot_theta) + w_robot_y;
+}
+//ロボット座標系をワールド座標系に変更する関数

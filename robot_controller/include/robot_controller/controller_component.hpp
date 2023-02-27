@@ -70,7 +70,7 @@ private:
   void handle_accepted(
     std::shared_ptr<GoalHandleRobotControl> goal_handle,
     const unsigned int robot_id);
-  State limit_world_velocity(const State & velocity, const double & max_velocity_xy) const;
+  State limit_world_velocity(const State & velocity, const double & max_velocity_xy, const double & max_velocity_theta) const;
   State limit_world_acceleration(
     const State & velocity, const State & last_velocity,
     const rclcpp::Duration & dt) const;
@@ -119,9 +119,10 @@ private:
   //ボールを蹴る
   std::vector<bool> ball_kick_con_flag;               //前回ループでボールを蹴る動作に入っていたかを確認するフラグ
   TrackedBall ball;
-  void decide_kick_xy(TrackedBall ball, State r_ball, State ball_goal, TrackedRobot my_robot, bool& ball_kick, std::vector<bool> &ball_kick_con_flag, 
-    const unsigned int robot_id);
+  void decide_kick_xy(TrackedBall ball, State r_ball, State ball_goal, TrackedRobot my_robot, State &next_goal_pose, std::vector<bool> &ball_kick_con_flag, 
+    const unsigned int robot_id, float &kick_con_max_velocity_theta);
   std::vector<kick_path> kick_con_path;
+  bool decide_ball_kick(TrackedBall ball, State r_ball, State ball_goal, TrackedRobot my_robot, int32_t ball_target_allowable_error);
 };
 
 }  // namespace robot_controller

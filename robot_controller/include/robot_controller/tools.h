@@ -48,8 +48,10 @@
 #define TRAPE_ROBOTXY_VIRUALXY_DISTANCE_CHECK 600   //台形制御中に仮の目標値とロボットの位置が離れられる最大値
 #define ROBOT_POSITION_RESET_DISTANCE 700         //ロボットの現在地と仮想目標値が大きく離れすぎた場合に現在地等をリセットする閾値となる距離
 
-#define WRAP_KICK_CONTROL_CHANGE_DISTANCE 100   //ボールに対する回り込み動作を行う最大のロボットとボールの距離
-#define ROBOT_KICK_ENABLE_X 85
+#define WRAP_KICK_CONTROL_CHANGE_DISTANCE 200   //ボールに対する回り込み動作を行う最大のロボットとボールの距離 (mm)
+#define ROBOT_KICK_ENABLE_X 85                  //ロボットがボールを蹴れる最大値のx(ロボット座標系) (mm)
+#define ROBOT_KICK_ENABLE_Y 40                  //ロボットがボールを蹴れる最大値のy(ロボット座標)系 (mm)
+#define ROBOT_KICK_MIN_X 100    //ボールを蹴るために保持するときのボールのロボット座標系のx座標(mm)(ロボットのキッカー中心までの距離＋ボールの半径)
 
 //最大値を算出
 float max_value(float data[], uint16_t size);
@@ -65,5 +67,11 @@ float angle_range_corrector_deg(float angle);
 bool angele_check(float check_angle, float angle_max, float angle_min);
 //-1~1で数字をラップする(float等で計算した場合わずかに超えたりする.acosfの引数などに使用)
 float modifid_acosf(float value);
+//-1~1で数字をラップする(float等で計算した場合わずかに超えたりする.asinfの引数などに使用)
+float modifid_asinf(float value);
+//ワールド座標系をロボット座標系に変更する関数
+void w_to_r_coordinate_chang(float w_x, float w_y, float *r_x, float *r_y, float w_robot_x, float w_robot_y, float w_robot_theta);
+//ロボット座標系をワールド座標系に変換する
+void r_to_w_coordinate_chang(float *w_x, float *w_y, float r_x, float r_y, float w_robot_x, float w_robot_y, float w_robot_theta);
 
 #endif // _TOOLS_H_
