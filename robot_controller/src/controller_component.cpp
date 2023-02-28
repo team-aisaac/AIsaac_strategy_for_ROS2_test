@@ -301,7 +301,6 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
       decide_kick_xy(ball, r_ball, ball_goal, my_robot, next_goal_pose, ball_kick_con_flag, robot_id, kick_con_max_velocity_theta);
       //RCLCPP_INFO(rclcpp::get_logger("kick"),"x : %lf, y: %lf", next_goal_pose.x, next_goal_pose.y);
       if(ball_kick){      //ボールを蹴る処理を実行(戦略PCから送信)
-        //動作未検証なので、回り込み動作完成後に動作確認の必要あり
         RCLCPP_INFO(rclcpp::get_logger("kick"),"kick prepair");
         if(decide_ball_kick(ball, r_ball, ball_goal, my_robot, ball_target_allowable_erroe)){
             command_msg->kick_power = kick_power;
@@ -543,7 +542,8 @@ void Controller::decide_kick_xy(TrackedBall ball, State r_ball, State ball_goal,
   const unsigned int robot_id, float &kick_con_max_velocity_theta){
   int32_t w_robot_x = my_robot.pos.x*1000;          //m->mm
   int32_t w_robot_y = my_robot.pos.y*1000;          //m->mm
-  int32_t w_robot_theta = 1000 * RAD_TO_DEG * my_robot.orientation;
+  int32_t w_robot_theta = 1000 * RAD_TO_DEG * my_robot.orientation; // 0.001 deg
+  int32_t robot_omega = 1000 * RAD_TO_DEG * my_robot.vel_angular[0]; // 0.001 deg/s
   int32_t w_ball_x = ball.pos.x * 1000;             //m->mm
   int32_t w_ball_y = ball.pos.y * 1000;             //m->mm
   int32_t r_ball_x = r_ball.x * 1000;             //m->mm
@@ -557,7 +557,7 @@ void Controller::decide_kick_xy(TrackedBall ball, State r_ball, State ball_goal,
     ball_kick_con_flag[robot_id] = 0;
   }else{
     ball_kick_con_flag[robot_id] = 1;
-    wrap_kick(w_robot_x, w_robot_y, w_robot_theta, w_ball_x, w_ball_y, target_ball_x, target_ball_y, r_ball_x, r_ball_y,
+    wrap_kick(w_robot_x, w_robot_y, w_robot_theta, robot_omega, w_ball_x, w_ball_y, target_ball_x, target_ball_y, r_ball_x, r_ball_y,
             &robot_goal_x, &robot_goal_y, &robot_goal_theta, &ball_kick_cin_max_velo_theta);
   }
   next_goal_pose.x = robot_goal_x;   //単位変換(mm -> m)

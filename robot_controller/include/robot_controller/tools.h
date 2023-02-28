@@ -51,7 +51,8 @@
 #define WRAP_KICK_CONTROL_CHANGE_DISTANCE 200   //ボールに対する回り込み動作を行う最大のロボットとボールの距離 (mm)
 #define ROBOT_KICK_ENABLE_X 85                  //ロボットがボールを蹴れる最大値のx(ロボット座標系) (mm)
 #define ROBOT_KICK_ENABLE_Y 40                  //ロボットがボールを蹴れる最大値のy(ロボット座標)系 (mm)
-#define ROBOT_KICK_MIN_X 100    //ボールを蹴るために保持するときのボールのロボット座標系のx座標(mm)(ロボットのキッカー中心までの距離＋ボールの半径)
+#define ROBOT_KICK_MIN_X 105    //ボールを蹴るために保持するときのボールのロボット座標系のx座標(mm)(ロボットのキッカー中心までの距離＋ボールの半径)
+#define ROBOT_WRAP_KICK_MAGIC_NUMBER 100    //回り込みキックをする際の調整係数
 
 //最大値を算出
 float max_value(float data[], uint16_t size);

@@ -12,11 +12,11 @@ vy_i_max: 0.0
 vy_i_min: 0.0
 vy_antiwindup: false
 
-vtheta_p: 6.0   #2.0
-vtheta_i: 0.02   #0.0
-vtheta_d: 0.8   #0.0
-vtheta_i_max: 0.1
-vtheta_i_min: 0.1
+vtheta_p: 7.0   #2.0
+vtheta_i: 0.0   #0.0
+vtheta_d: 1.0   #0.0
+vtheta_i_max: 0.5
+vtheta_i_min: -0.5
 vtheta_antiwindup: false
 
 max_acceleration_xy: 3.0  # m/s^2
