@@ -24,6 +24,7 @@ typedef struct{
     float jerk;             //(mm/s^3)
     float accel;            //(mm/s^2)
     float max_accel;        //(mm/s^2)
+    float de_max_accel;         //減速時の(mm/s^2)
     float velocity;         //(mm/s)
     float max_velocity;     //(mm/s)
     float unit_vector_x;               //(mm/s)
@@ -41,8 +42,12 @@ int8_t micon_jerk_flag_check(float distance, float braking_distance);
 void micon_trapezoidal_control(int32_t targetX, int32_t targetY, micon_trape_con *trape_c);
 //台形制御の係数初期化
 void micon_trapezoidal_init(micon_trape_con *trape_c);
+//ドリブルのための台形制御の係数初期化
+void dribble_micon_trapezoidal_init(micon_trape_con *trape_c);
 //台形制御時にロボットと仮想目標値が離れすぎた場合に補正するための関数
 void micon_trapezoidal_robotXY_vertualXY_distance_check(micon_trape_con *trape_c, int32_t x, int32_t y);
+//ドリブルのための台形制御
+void micon_trapezoidal_dribble_control(int32_t targetX, int32_t targetY, micon_trape_con *trape_c, int32_t w_ball_x, int32_t w_ball_y);
 
 #ifdef __cplusplus
 }

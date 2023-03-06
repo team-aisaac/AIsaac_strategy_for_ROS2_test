@@ -122,8 +122,21 @@ void w_to_r_coordinate_chang(float w_x, float w_y, float *r_x, float *r_y, float
     *r_x = (w_x - w_robot_x)*cosf(-w_robot_theta) - (w_y - w_robot_y)*sinf(-w_robot_theta);
     *r_y = (w_x - w_robot_x)*sinf(-w_robot_theta) + (w_y - w_robot_y)*cosf(-w_robot_theta);
 }
+//ロボット座標系をワールド座標系に変更する関数
 void r_to_w_coordinate_chang(float *w_x, float *w_y, float r_x, float r_y, float w_robot_x, float w_robot_y, float w_robot_theta){
     *w_x = r_x*cosf(w_robot_theta) - r_y*sinf(w_robot_theta) + w_robot_x;
     *w_y = r_x*sinf(w_robot_theta) + r_y*cosf(w_robot_theta) + w_robot_y;
 }
-//ロボット座標系をワールド座標系に変更する関数
+//(x1,y1)と(x2,y2)を通る直線上の店の中で(x3,y3)に最も近い点(x,y)を求める
+bool nearest_point_to_straight_line(float x1, float y1, float x2, float y2 ,float x3, float y3, float *x, float *y){
+    float v_x = x2 - x1;
+    float v_y = y2 - y1;
+    float square_norm = v_x*v_x + v_y*v_y;
+    if(square_norm <= 0){  //(x1,y1)と(x2,y2)が近すぎる、あるいは一致しているときは計算しない
+        return false;
+    }
+    float t = (v_x*(x3-x1) + v_y*(y3-y1))/square_norm;
+    *x = x1 + t*v_x;
+    *y = y1 + t*v_y;
+    return true;
+}

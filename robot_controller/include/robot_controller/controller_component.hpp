@@ -114,15 +114,25 @@ private:
   std::vector<State> next_goal_pose;
   void decide_next_goal_xy(State goal_pose, State &midle_goal_pose, State &next_goal_pose, bool prohidited_zone_ignore, bool &midle_target_flag, 
     const unsigned int robot_id, TrackedRobot my_robot, bool team_is_yellow_, std::vector<bool> &trape_controle_flag, std::vector<micon_trape_con> &trape_c);
+  void decide_next_goal_xy2(State goal_pose, State &midle_goal_pose, State &next_goal_pose, bool prohidited_zone_ignore, bool &midle_target_flag, 
+    const unsigned int robot_id, TrackedRobot my_robot, bool team_is_yellow_, std::vector<bool> &trape_controle_flag, std::vector<micon_trape_con> &trape_c);
   std::vector<dwa_robot_path> dwa_robot;
 
   //ボールを蹴る
   std::vector<bool> ball_kick_con_flag;               //前回ループでボールを蹴る動作に入っていたかを確認するフラグ
   TrackedBall ball;
   void decide_kick_xy(TrackedBall ball, State r_ball, State ball_goal, TrackedRobot my_robot, State &next_goal_pose, std::vector<bool> &ball_kick_con_flag, 
-    const unsigned int robot_id, float &kick_con_max_velocity_theta);
+    const unsigned int robot_id, float &kick_con_max_velocity_theta, bool free_kick_flag, int32_t ball_target_allowable_error, bool ball_kick);
   std::vector<kick_path> kick_con_path;
   bool decide_ball_kick(TrackedBall ball, State r_ball, State ball_goal, TrackedRobot my_robot, int32_t ball_target_allowable_error);
+  
+  //ドリブルをする
+  std::vector<bool> dribble_con_flag;               //ドリブル動作に入っているかを確認するフラグ
+  std::vector<bool> dribble_ball_move_flag;         //ドリブルでボールを運んでいる動作をしているか確認するフラグ
+  std::vector<micon_trape_con> dribble_trape_c;     //ドリブル動作時の台形制御を行う構造体
+  void decide_dribble_xy(State dribble_goal, TrackedBall ball, State r_ball, TrackedRobot my_robot, float kick_con_max_velocity_theta, State &next_goal_pose, 
+    std::vector<bool> &dribble_con_flag, const unsigned int robot_id, int32_t dribble_complete_distance, std::vector<micon_trape_con> &dribble_trape_c, 
+    std::vector<bool> &dribble_ball_move_flag);
 };
 
 }  // namespace robot_controller

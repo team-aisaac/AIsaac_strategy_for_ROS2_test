@@ -187,6 +187,119 @@ void micon_trapezoidal_init(micon_trape_con *trape_c){
     trape_c->virtual_y = 0;
 }
 
+void dribble_micon_trapezoidal_init(micon_trape_con *trape_c){
+    trape_c->jerk = ROBOT_MAX_JARK;
+    trape_c->accel = 0;
+    trape_c->max_accel = ROBOT_MAX_ACCEL;
+    trape_c->de_max_accel = ROBOT_DRIBBLE_MAX_ACCEL;
+    trape_c->velocity = 0;
+    trape_c->max_velocity = ROBOT_MAX_VEL;
+    trape_c->virtual_x = 0;
+    trape_c->virtual_y = 0;
+}
+
+//ドリブルのための台形制御
+void micon_trapezoidal_dribble_control(int32_t targetX, int32_t targetY, micon_trape_con *trape_c, int32_t w_ball_x, int32_t w_ball_y){
+    float abjust_x;
+    float abjust_y;
+    if(nearest_point_to_straight_line((float) w_ball_x, (float) w_ball_y, (float) targetX, (float) targetY ,trape_c->virtual_x, trape_c->virtual_y, &abjust_x, &abjust_y)){
+        trape_c->virtual_x = abjust_x;
+        trape_c->virtual_y = abjust_y;
+    }
+    if((targetX - trape_c->virtual_x) * (targetX - trape_c->virtual_x) + (targetY - trape_c->virtual_y) * (targetY - trape_c->virtual_y) == 0){
+        trape_c->virtual_x = trape_c->virtual_x + trape_c->velocity * trape_c->unit_vector_x * MICON_TIME_STEP;
+        trape_c->virtual_y = trape_c->virtual_y + trape_c->velocity * trape_c->unit_vector_y * MICON_TIME_STEP;
+        return;
+    }
+    float distance = sqrt((targetX - trape_c->virtual_x) * (targetX - trape_c->virtual_x) + (targetY - trape_c->virtual_y) * (targetY - trape_c->virtual_y));
+    //通り過ぎた場合
+    if((trape_c->unit_vector_x * (targetX - trape_c->virtual_x) + trape_c->unit_vector_y * (targetY - trape_c->virtual_y)) / distance < 0){
+        trape_c->velocity = -trape_c->velocity;
+        trape_c->accel = -trape_c->accel;
+    }
+    //目標値の計算と単位ベクトルの算出
+    trape_c->unit_vector_x = (targetX - trape_c->virtual_x) / distance;
+    trape_c->unit_vector_y = (targetY - trape_c->virtual_y) / distance;
+    //jerkの判定
+    int8_t jerk_flag = 0; //-1:jerk--, 1:jerk++, 0:jerk = jerk
+    //速度の最大値に近づいている場合
+    if((trape_c->max_velocity - trape_c->velocity) <= (trape_c->accel*trape_c->accel / (2*trape_c->jerk))){
+        jerk_flag = -1;
+    }
+    //目標から離れていく方向に速度を持っている場合
+    else if(trape_c->velocity < 0 && trape_c->accel < 0){
+        jerk_flag = 50;
+        //printf("1 %d\n", jerk_flag);
+    }
+    else if(trape_c->velocity < 0 && 0 <= trape_c->accel){
+        float in_sqrt = trape_c->accel*trape_c->accel + 2*trape_c->jerk*trape_c->velocity;
+        if(in_sqrt < 0){
+            jerk_flag = 50;
+            //printf("2, %d\n", jerk_flag);
+        }
+        else{
+            float a_t = sqrt(in_sqrt);
+            float t_v0 = (trape_c->accel - a_t)/trape_c->jerk;
+            float negative_braking_distance = -trape_c->jerk*t_v0*t_v0*t_v0/6 + trape_c->accel*t_v0*t_v0/2 + trape_c->velocity*t_v0;
+            float b = (1 + sqrt(2))*a_t/trape_c->jerk;
+            float t = (a_t + b * trape_c->jerk)/(2 * trape_c->jerk);
+            float positive_braking_distance = -trape_c->jerk*t*t*t/6 + trape_c->accel*t*t/2 + trape_c->velocity*t + trape_c->jerk*(b-t)*(b-t)*(b-t)/2;
+            float braking_distance = positive_braking_distance - negative_braking_distance;
+            jerk_flag = micon_jerk_flag_check(distance, braking_distance);
+            if(jerk_flag == 1){
+                jerk_flag = 50;
+            }
+            //printf("3 %d\n", jerk_flag);
+        }
+    }
+    //制動距離と目標点までの距離の差から躍度を算出する場合
+    else{
+        float b1 = 2*trape_c->accel* trape_c->accel;
+        float b2 = 4 * trape_c->jerk * trape_c->velocity;
+        float b = (trape_c->accel + sqrt(b1 + b2)) / trape_c->jerk;
+        float a_check = (trape_c->accel - b * trape_c->jerk) / 2;
+        if(-trape_c->de_max_accel < a_check){
+            float t = (trape_c->accel + b * trape_c->jerk)/(2 * trape_c->jerk);
+            float braking_distance = -trape_c->jerk*t*t*t/6 + trape_c->accel*t*t/2 + trape_c->velocity*t + trape_c->jerk*(b-t)*(b-t)*(b-t)/6;
+            jerk_flag = micon_jerk_flag_check(distance, braking_distance+1);
+            //printf("1,%f,%f\n",distance,braking_distance);
+        }
+        else if(a_check <= -trape_c->de_max_accel){
+            float t = (trape_c->accel + trape_c->de_max_accel) / trape_c->jerk;
+            float v1 = -trape_c->jerk*t*t/2 + trape_c->accel*t + trape_c->velocity;
+            float v2 = trape_c->de_max_accel*trape_c->de_max_accel / (2*trape_c->jerk);
+            float distance1 = -trape_c->jerk*t*t*t/6 + trape_c->accel*t*t/2 + trape_c->velocity*t;
+            float distance2 = trape_c->de_max_accel * trape_c->de_max_accel * trape_c->de_max_accel / (6 * trape_c->jerk * trape_c->jerk);
+            float braking_distance = distance1 + (v1 + v2)*(v1 - v2) / (2 * trape_c->de_max_accel) + distance2;
+            jerk_flag = micon_jerk_flag_check(distance, braking_distance+1);
+            //printf("2,%f,%f\n",distance, braking_distance);
+        }
+        float t = (trape_c->accel+b*trape_c->jerk)/(2*trape_c->jerk);
+        if(t <= 0){
+            jerk_flag = 1;
+            //printf("3\n");
+        }
+    }
+    //printf("jerk %d\n", jerk_flag);
+    //速度･加速度･目標値の算出
+    trape_c->accel = trape_c->accel + jerk_flag * trape_c->jerk * MICON_TIME_STEP;
+    if(trape_c->max_accel < trape_c->accel) {
+        trape_c->accel = trape_c->max_accel;
+    }
+    else if(trape_c->accel < -trape_c->de_max_accel){
+        trape_c->accel = -trape_c->de_max_accel;
+    }
+    trape_c->velocity = trape_c->velocity + trape_c->accel * MICON_TIME_STEP;
+    if(trape_c->max_velocity < trape_c->velocity){
+        trape_c->velocity = trape_c->max_velocity;
+    }
+    else if(trape_c->velocity < -trape_c->max_velocity){
+        trape_c->velocity = -trape_c->max_velocity;
+    }
+    trape_c->virtual_x = trape_c->virtual_x + trape_c->velocity * trape_c->unit_vector_x * MICON_TIME_STEP;
+    trape_c->virtual_y = trape_c->virtual_y + trape_c->velocity * trape_c->unit_vector_y * MICON_TIME_STEP;
+}
+
 void micon_trapezoidal_robotXY_vertualXY_distance_check(micon_trape_con *trape_c, int32_t x, int32_t y){
     float distance = 0;
     if(0 < (trape_c->virtual_x - x)*(trape_c->virtual_x - x) + (trape_c->virtual_y - y)*(trape_c->virtual_y - y)){

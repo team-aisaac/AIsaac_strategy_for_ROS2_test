@@ -41,6 +41,8 @@ add_library(controller_component SHARED
   #ball kick
   src/ball_wrap_kick_src/wrap_kick.c
   src/ball_wrap_kick_src/micon_wrap_kick.c
+  #dribble
+  src/dribble_src/dribble.c
   src/tools.c
 )
 target_compile_definitions(controller_component
