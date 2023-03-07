@@ -22,6 +22,7 @@ bool dribble_wrap_motion(int32_t w_robot_x, int32_t w_robot_y, int32_t w_robot_t
     float x_omega_offset = ROBOT_KICK_MIN_X * (1 - cosf(RASPI_TIME_STEP*w_robot_rad_omega));    
     float y_omega_offset = ROBOT_KICK_MIN_X * sinf(RASPI_TIME_STEP*w_robot_rad_omega);
     float r_goal_x = r_ball_x - ROBOT_KICK_MIN_X; //現在のロボット座標系でのロボットの目標値のx座標
+    RCUTILS_LOG_INFO("max vel theta %d", ball_kick_cin_max_velo_theta);
     float r_goal_y = r_ball_y - ROBOT_WRAP_KICK_MAGIC_NUMBER*w_robot_omega/(ball_kick_cin_max_velo_theta); //現在のロボット座標系でのロボットの目標値のy座標
     float w_goal_x, w_goal_y;   //world座標系でのロボットの目標値
     r_to_w_coordinate_chang(&w_goal_x, &w_goal_y, r_goal_x + x_omega_offset, r_goal_y + y_omega_offset, (float) w_robot_x, (float) w_robot_y, w_robot_rad);

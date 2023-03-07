@@ -128,7 +128,7 @@ private:
   std::vector<bool> dribble_con_flag;               //ドリブル動作に入っているかを確認するフラグ
   std::vector<bool> dribble_ball_move_flag;         //ドリブルでボールを運んでいる動作をしているか確認するフラグ
   std::vector<micon_trape_con> dribble_trape_c;     //ドリブル動作時の台形制御を行う構造体
-  void decide_dribble_xy(State dribble_goal, TrackedBall ball, State r_ball, TrackedRobot my_robot, float kick_con_max_velocity_theta, State &next_goal_pose, 
+  void decide_dribble_xy(State dribble_goal, TrackedBall ball, State r_ball, TrackedRobot my_robot, float &dribble_con_max_velocity_theta, State &next_goal_pose, 
     std::vector<bool> &dribble_con_flag, const unsigned int robot_id, int32_t dribble_complete_distance, std::vector<micon_trape_con> &dribble_trape_c, 
     std::vector<bool> &dribble_ball_move_flag);
 };
