@@ -140,3 +140,15 @@ bool nearest_point_to_straight_line(float x1, float y1, float x2, float y2 ,floa
     *y = y1 + t*v_y;
     return true;
 }
+//(x1,y1)と(x2,y2)のノルムを計算する関数
+float norm(float x1, float y1, float x2, float y2){
+    float square_norm = (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2);
+    if (square_norm < 0)
+    {
+        return 0;
+    }
+    else{
+        return sqrt(square_norm);
+    }
+    
+}

@@ -49,12 +49,13 @@
 #define TRAPE_ROBOTXY_VIRUALXY_DISTANCE_CHECK 600   //台形制御中に仮の目標値とロボットの位置が離れられる最大値
 #define ROBOT_POSITION_RESET_DISTANCE 700         //ロボットの現在地と仮想目標値が大きく離れすぎた場合に現在地等をリセットする閾値となる距離
 
-#define WRAP_KICK_CONTROL_CHANGE_DISTANCE 60   //ボールに対する回り込み動作を行う最大のロボットとボールの距離 (mm)
-#define ROBOT_KICK_ENABLE_X 85                  //ロボットがボールを蹴れる最大値のx(ロボット座標系) (mm)
+#define WRAP_KICK_CONTROL_CHANGE_DISTANCE 100   //ボールに対する回り込み動作を行う最大のロボットとボールの距離 (mm)
+#define ROBOT_KICK_ENABLE_X 90                  //ロボットがボールを蹴れる最大値のx(ロボット座標系) (mm)
 #define ROBOT_KICK_ENABLE_Y 40                  //ロボットがボールを蹴れる最大値のy(ロボット座標)系 (mm)
-#define ROBOT_KICK_MIN_X 105    //ボールを蹴るために保持するときのボールのロボット座標系のx座標(mm)(ロボットのキッカー中心までの距離＋ボールの半径)
+#define ROBOT_KICK_MIN_X 95    //ボールを蹴るために保持するときのボールのロボット座標系のx座標(mm)(ロボットのキッカー中心までの距離＋ボールの半径)
 #define ROBOT_WRAP_KICK_MAGIC_NUMBER 100    //回り込みキックをする際の調整係数
-#define ROBOT_NOT_TOUCH_MIN_X 140           //回り込み動作時にボールに触れない最小のx座標
+#define ROBOT_NOT_TOUCH_MIN_X 105           //回り込み動作時にボールに触れない最小のx座標
+#define ROBOT_WRAP_DRIBBLE_NON_ACTIVE 30    //回り込みキックの際にドリブラーを回さない距離(mm)(実際のロボットでは0にする予定)
 
 #define ROBOT_DRIBBLE_START_DEG 10         //ロボットがドリブルによってボールを運ぶときにロボット目標値の向きからずれられる最大角度(DEG)
 #define ROBOT_DRIBBLE_ABJUST_DEG 5/200     //ロボットがドリブルによってボールを運ぶときにボールがロボット中央からずれていたら傾きを調整する係数
@@ -82,5 +83,6 @@ void w_to_r_coordinate_chang(float w_x, float w_y, float *r_x, float *r_y, float
 void r_to_w_coordinate_chang(float *w_x, float *w_y, float r_x, float r_y, float w_robot_x, float w_robot_y, float w_robot_theta);
 //(x1,y1)と(x2,y2)を通る直線上の店の中で(x3,y3)に最も近い点を求める
 bool nearest_point_to_straight_line(float x1, float y1, float x2, float y2 ,float x3, float y3, float *x, float *y);
-
+//(x1,y1)と(x2,y2)のノルムを計算する関数
+float norm(float x1, float y1, float x2, float y2);
 #endif // _TOOLS_H_

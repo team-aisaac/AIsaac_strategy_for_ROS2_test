@@ -1,23 +1,37 @@
 vx_p: 6.0   # 3.0
 vx_i: 0.0
-vx_d: 1.0     #0.7
+vx_d: 0.7     #0.7
 vx_i_max: 0.0
 vx_i_min: 0.0
 vx_antiwindup: false
 
 vy_p: 6.0
 vy_i: 0.0
-vy_d: 1.0
+vy_d: 0.7
 vy_i_max: 0.0
 vy_i_min: 0.0
 vy_antiwindup: false
 
-vtheta_p: 7.0   #2.0
+vtheta_p: 5.5   #2.0
 vtheta_i: 0.0   #0.0
-vtheta_d: 1.0   #0.0
+vtheta_d: 0.5   #0.0
 vtheta_i_max: 0.5
 vtheta_i_min: -0.5
 vtheta_antiwindup: false
+
+circumferential_p: 6.0
+circumferential_i: 0.0
+circumferential_d: 0.7
+circumferential_i_max: 0.0
+circumferential_i_min: 0.0
+circumferential_antiwindup: false
+
+radius_p: 3.0
+radius_i: 0.0
+radius_d: 0.7
+radius_i_max: 0.0
+radius_i_min: 0.0
+radius_antiwindup: false
 
 max_acceleration_xy: 3.0  # m/s^2
 max_acceleration_theta: 12.0  # rad/s^2

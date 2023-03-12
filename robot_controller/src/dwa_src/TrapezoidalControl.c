@@ -202,6 +202,12 @@ void dribble_micon_trapezoidal_init(micon_trape_con *trape_c){
 void micon_trapezoidal_dribble_control(int32_t targetX, int32_t targetY, micon_trape_con *trape_c, int32_t w_ball_x, int32_t w_ball_y){
     float abjust_x;
     float abjust_y;
+    float target_robot_distance = norm((float)targetX, (float)targetY, (float)w_ball_x, (float)w_ball_y);
+    if(target_robot_distance == 0){
+        return;
+    }
+    targetX = targetX - ROBOT_KICK_MIN_X * ((float)targetX - (float)w_ball_x)/target_robot_distance;
+    targetY = targetY - ROBOT_KICK_MIN_X * ((float)targetY - (float)w_ball_y)/target_robot_distance;
     if(nearest_point_to_straight_line((float) w_ball_x, (float) w_ball_y, (float) targetX, (float) targetY ,trape_c->virtual_x, trape_c->virtual_y, &abjust_x, &abjust_y)){
         trape_c->virtual_x = abjust_x;
         trape_c->virtual_y = abjust_y;

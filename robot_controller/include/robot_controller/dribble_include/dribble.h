@@ -6,10 +6,9 @@ extern "C" {
 #endif
 
 #include "robot_controller/dwa_include/TrapezoidalControl.h"
+#include "robot_controller/ball_wrap_kick_include/wrap_kick.h"
 
-bool dribble_wrap_motion(int32_t w_robot_x, int32_t w_robot_y, int32_t w_robot_theta, int32_t w_robot_omega, int32_t w_ball_x, int32_t w_ball_y, int32_t r_ball_x, int32_t r_ball_y, 
-    int32_t w_ball_vx, int32_t w_ball_vy, int32_t dribble_goal_x, int32_t dribble_goal_y, int32_t dribble_goal_theta, int32_t *robot_goal_x, int32_t *robot_goal_y, int32_t *robot_goal_theta, 
-    int32_t ball_kick_cin_max_velo_theta, bool dribble_ball_move_flag);
+bool dribble_wrap_motion(wrap_kick_robot robot, wrap_kick_ball ball, wrap_motion_pid *pid, int32_t ball_target_allowable_error, bool dribble_ball_move_flag, bool *dribble_active);
 
 int32_t dribble_move_deg(int32_t r_ball_y, int32_t robot_goal_theta);
 

@@ -39,7 +39,7 @@ Controller::Controller(const rclcpp::NodeOptions & options)
   //各変数の設定
   declare_parameter("team_is_yellow", false);
   declare_parameter("invert", false);
-  std::vector<std::string> prefix_list = {"vx_", "vy_", "vtheta_"};
+  std::vector<std::string> prefix_list = {"vx_", "vy_", "vtheta_", "circumferential_", "radius_"};
   for (const auto & prefix : prefix_list) {
     declare_parameter(prefix + "p", 1.5);
     declare_parameter(prefix + "i", 0.0);
@@ -81,18 +81,21 @@ Controller::Controller(const rclcpp::NodeOptions & options)
     need_response_.push_back(false);    //何？
     system_stop_.push_back(true);       //戦略側の停止要求があるかを判定する(本当に必要かをもう一度検証する)
     last_update_time_.push_back(steady_clock_.now()); //制御に利用する１ループ前の時刻を保持する変数
-    last_world_vel_.push_back(State());               //制御に利用する１ループ前のロボットの即時ド情報を保持する変数
+    last_world_vel_.push_back(State());               //制御に利用する１ループ前のロボットの速度情報を保持する変数
     robot_vertual_vel.push_back(State());             //ロボットを制御するために、その時の制御ループの目標速度(ワールド座標系)を格納する 
     trape_controle_flag.push_back(false);             //前回のループで台形制御を行っていたかを判定するフラグ
     trape_c.push_back(micon_trape_con());             //台形制御を行うための構造体 
     micon_trapezoidal_init(&trape_c[i]);              //台形制御を行うための構造体の初期化
     dwa_robot.push_back(dwa_robot_path());            //DWAを使用するための構造体
     ball_kick_con_flag.push_back(false);              //ロボットがキックを行うための制御を行っているかを判定するフラグ
-    kick_con_path.push_back(kick_path());             //ロボットがキックを行うための制御を行うための経路
     dribble_con_flag.push_back(false);                //ロボットがドリブル動作をしているかを判定するフラグ
     dribble_ball_move_flag.push_back(false);          //ドリブルでボールを運んでいる動作をしているか確認するフラグ
     dribble_trape_c.push_back(micon_trape_con());     //ドリブル動作時の台形制御を行う構造体
     dribble_micon_trapezoidal_init(&dribble_trape_c[i]);
+    ball_wrap_pid.push_back(false);                   //ボール回り込み動作用のPID制御を行う
+    position_pid.push_back(false);                    //目標位置に対してPID制御を行う
+    pre_circumferential_v.push_back(0);               //ボール回り込み動作円周方向の速度制御
+    pre_radius_v.push_back(0);                        //ボール回り込み動作半径方向の速度制御
     dwa_robot[i].x = 0;
     dwa_robot[i].y = 0;
     dwa_robot[i].theta = 0;
@@ -156,6 +159,22 @@ Controller::Controller(const rclcpp::NodeOptions & options)
         get_parameter("vtheta_antiwindup").get_value<bool>()
       )
     );
+    pid_wrap_circumferential_.push_back(std::make_shared<control_toolbox::Pid>(
+        get_parameter("circumferential_p").get_value<double>(),
+        get_parameter("circumferential_i").get_value<double>(),
+        get_parameter("circumferential_d").get_value<double>(),
+        get_parameter("circumferential_i_max").get_value<double>(),
+        get_parameter("circumferential_i_min").get_value<double>(),
+        get_parameter("circumferential_antiwindup").get_value<bool>())
+    );
+    pid_wrap_radius_.push_back(std::make_shared<control_toolbox::Pid>(
+        get_parameter("radius_p").get_value<double>(),
+        get_parameter("radius_i").get_value<double>(),
+        get_parameter("radius_d").get_value<double>(),
+        get_parameter("radius_i_max").get_value<double>(),
+        get_parameter("radius_i_min").get_value<double>(),
+        get_parameter("radius_antiwindup").get_value<bool>())
+    );
 
     //タイマーを制作してロボットを制御する
     // bindでは関数を宣言できなかったので、ラムダ式を使用する(by consai)
@@ -201,6 +220,10 @@ Controller::Controller(const rclcpp::NodeOptions & options)
           RCLCPP_INFO(this->get_logger(), "Update vy_pid gains.");
         } else if (update_pid_gain_from_param(parameter, "vtheta_", pid_vtheta_)) {
           RCLCPP_INFO(this->get_logger(), "Update vtheta_pid gains.");
+        } else if (update_pid_gain_from_param(parameter, "circumferential_", pid_wrap_circumferential_)) {
+          RCLCPP_INFO(this->get_logger(), "Update circumferential_pid gains.");
+        } else if (update_pid_gain_from_param(parameter, "radius_", pid_wrap_radius_)) {
+          RCLCPP_INFO(this->get_logger(), "Update radius_pid gains.");
         }
 
         if (parameter.get_name() == "max_acceleration_xy") {
@@ -271,6 +294,8 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
   float dribble_con_max_velocity_theta = max_velocity_theta_;   //ロボットが出せる最大角加速度で初期化
   State next_goal_pose;   //次のループまでのゴール座標(DWAや台形制御を用いて計算される目標値)
   State r_ball;        //ボールを蹴る際の目標地点
+  bool pre_position_pid = position_pid[robot_id];
+  bool pre_ball_wrap_pid = ball_wrap_pid[robot_id];
   //今後戦略版から送信するコマンド
   //変数の初期化
   State goal_pose;
@@ -281,50 +306,61 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
   bool midle_target_flag = 0;
   State midle_goal_pose;
   double dribble_power = 0.0;
-  bool dribble_state = 0;         //ドリブルを行うかを判定するフラグ
+  bool dribble_state = 1;         //ドリブルを行うかを判定するフラグ
   bool dribbler_active = 1; //ドリブラーを強制回転させるフラグ
   double kick_power = 10.0;
-  bool ball_kick_state = 1; //ボールセンサでボールを検知したらボールを蹴るための回り込み動作を行うかを判定するフラグ
+  bool ball_kick_state = 0; //ボールセンサでボールを検知したらボールを蹴るための回り込み動作を行うかを判定するフラグ
   bool ball_kick = 1;     //ボールを蹴るかを判定するフラグ
   bool free_kick_flag = 0;  //フリーキックが否かを判定するフラグ(true:回り込み動作時にボールに触らない, false:回り込み動作時にボールに触りできるだけ保持する)
   State ball_goal;        //ボールを蹴る際の目標地点
-  //ball_goal.x = 0;
-  //ball_goal.y = 0;
   ball_goal.x = -2.0;     //蹴ったボールの目標地点
-  ball_goal.y = 3.0;      //蹴ったボールの目標地点
-  int32_t ball_target_allowable_erroe = 200;     //ボールの目標点をボールが通過する際の許容誤差。1000以上を設定するとボールをクリアする
+  ball_goal.y = -3.0;      //蹴ったボールの目標地点
+  int32_t ball_target_allowable_erroe = 100;     //ボールの目標点をボールが通過する際の許容誤差。1000以上を設定するとボールをクリアする
   State dribble_goal;
   dribble_goal.x = 1.5;
-  dribble_goal.y = 3.5;
-  int32_t dribble_complete_distance = 50;       //ドリブル目標点にどれだけ近づいたら終了とするかを決める距離(mm)
+  dribble_goal.y = -3.5;
+  int32_t dribble_complete_distance = 100;       //ドリブル目標点にどれだけ近づいたら終了とするかを決める距離(mm)
   //戦略AIから指示を受ける
   if(goal_handle_[robot_id]){
     parser_.parse_goal(
       goal_handle_[robot_id]->get_goal(), my_robot, goal_pose, kick_power,
       dribble_power);
   }
-  //PID制御のための時間計測
-  auto current_time = steady_clock_.now();
-  auto duration = current_time - last_update_time_[robot_id];
-  //ボールを蹴る動作を前提とする場合の処理
+  //ボールのロボット座標の算出(ロボットはボールセンサとカメラ情報から算出する)
   r_ball.x = (ball.pos.x - my_robot.pos.x)*cosf(-my_robot.orientation) - (ball.pos.y - my_robot.pos.y)*sinf(-my_robot.orientation);
   r_ball.y = (ball.pos.x - my_robot.pos.x)*sinf(-my_robot.orientation) + (ball.pos.y - my_robot.pos.y)*cosf(-my_robot.orientation);  
-  
+  double circumferential_error, radius_error, goal_theta;
+  float ob_unit_vec_circumferential_x, ob_unit_vec_circumferential_y, ob_unit_vec_radius_x, ob_unit_vec_radius_y;
   if(ball_kick_state){  //ボールを蹴るための位置移動を行うかを判定(戦略PCから送信)
   //ボールセンサに反応するかを判定(ロボットに実装する場合はボールセンサでボールの位置が取れるかで判定する)
     if(((-0.06 <= r_ball.y && r_ball.y <= 0.06) && (0.08 <= r_ball.x && r_ball.x <= 0.13)) || ball_kick_con_flag[robot_id] == 1){
-      dribble_power = 10.0;
       trape_controle_flag[robot_id] = 0;  //DWAの台形制御のフラグ
       //ボールセンサに反応だないときはカメラの情報、ボールセンサが反応しているときはその値を使用する
-      decide_kick_xy(ball, r_ball, ball_goal, my_robot, next_goal_pose, ball_kick_con_flag, robot_id, kick_con_max_velocity_theta, 
-        free_kick_flag, ball_target_allowable_erroe, ball_kick);
-      //RCLCPP_INFO(rclcpp::get_logger("kick"),"x : %lf, y: %lf", next_goal_pose.x, next_goal_pose.y);
-      if(ball_kick){      //ボールを蹴る処理を実行(戦略PCから送信)
-        if(decide_ball_kick(ball, r_ball, ball_goal, my_robot, ball_target_allowable_erroe)){
-            command_msg->kick_power = kick_power;
-            //ball_kick_con_flag[robot_id] = 0;
-        }
+      bool ball_kick_con = false; //ボールを蹴る動作を実行するかを判定するフラグ
+      bool wrap_kick_xy_flag = false;
+      bool dribble_active = true;
+      robot_wrap_kick(next_goal_pose, ball, r_ball, ball_goal, my_robot, circumferential_error, radius_error, goal_theta, ball_kick_con_flag, robot_id, kick_con_max_velocity_theta, 
+        free_kick_flag, ball_target_allowable_erroe, ball_kick, ball_kick_con, ob_unit_vec_circumferential_x, ob_unit_vec_circumferential_y, 
+        ob_unit_vec_radius_x, ob_unit_vec_radius_y, wrap_kick_xy_flag, dribble_active);
+      if(dribble_active){
+        dribble_power = 0.1;
+      }else{
+        dribble_power = 0; 
       }
+      command_msg->dribble_power = dribble_power;
+      if(!wrap_kick_xy_flag){
+        ball_wrap_pid[robot_id] = true;
+        position_pid[robot_id] = false;
+      }
+      else{
+        ball_wrap_pid[robot_id] = false;
+        position_pid[robot_id] = true;
+      }
+      //RCLCPP_INFO(rclcpp::get_logger("kick"),"x : %lf, y: %lf", next_goal_pose.x, next_goal_pose.y);
+      if(ball_kick_con){      //ボールを蹴る処理を実行
+            command_msg->kick_power = kick_power;
+      }
+      next_goal_pose.theta = goal_theta;
     }
   }
   else{
@@ -334,10 +370,29 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
   if(dribble_state){
     //ボールセンサに反応するかを判定(ロボットに実装する場合はボールセンサでボールの位置が取れるかで判定する)
     if(((-0.06 <= r_ball.y && r_ball.y <= 0.06) && (0.08 <= r_ball.x && r_ball.x <= 0.13)) || dribble_con_flag[robot_id] == 1){
-      dribble_power = 10.0;
       trape_controle_flag[robot_id] = 0;
-      decide_dribble_xy(dribble_goal, ball, r_ball, my_robot, dribble_con_max_velocity_theta, next_goal_pose, dribble_con_flag, robot_id, dribble_complete_distance, 
-        dribble_trape_c, dribble_ball_move_flag);
+      bool dribble_active = true;
+      dribble(dribble_goal, ball, r_ball, my_robot, next_goal_pose, dribble_con_flag, robot_id, dribble_complete_distance, 
+        dribble_trape_c, dribble_ball_move_flag, circumferential_error, radius_error, ob_unit_vec_circumferential_x, ob_unit_vec_circumferential_y, 
+        ob_unit_vec_radius_x, ob_unit_vec_radius_y, dribble_active);
+      if(dribble_active){
+        dribble_power = 0.1;
+      }else{
+        dribble_power = 0; 
+      }
+      command_msg->dribble_power = dribble_power;
+      if(!dribble_ball_move_flag[robot_id]){
+        ball_wrap_pid[robot_id] = true;
+        position_pid[robot_id] = false;
+      }
+      else{
+        ball_wrap_pid[robot_id] = false;
+        position_pid[robot_id] = true;
+      }
+    }
+    else{
+      dribble_con_flag[robot_id] = 0;
+      dribble_ball_move_flag[robot_id] = 0;  
     }
   }
   else{
@@ -347,28 +402,50 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
 
   if(ball_kick_con_flag[robot_id] == 0 && dribble_con_flag[robot_id] == 0){
     dribble_ball_move_flag[robot_id] = 0;
+    ball_wrap_pid[robot_id] = false;
+    position_pid[robot_id] = true;
+    dribble_power = 0;
+    command_msg->dribble_power = dribble_power;
     //算出された目標点まで移動するために、次のループまでの目標点を決定する
     decide_next_goal_xy(goal_pose, midle_goal_pose, next_goal_pose, prohidited_zone_ignore, midle_target_flag, 
       robot_id, my_robot, team_is_yellow_, trape_controle_flag, trape_c);
-    //PID制御を行う
-    world_vel.x = pid_vx_[robot_id]->computeCommand(
-      next_goal_pose.x - my_robot.pos.x,
-      duration.nanoseconds());
-    world_vel.y = pid_vy_[robot_id]->computeCommand(
-      next_goal_pose.y - my_robot.pos.y,
-      duration.nanoseconds());
-    world_vel.theta =
-      pid_vtheta_[robot_id]->computeCommand(
-      tools::normalize_theta(
-        next_goal_pose.theta -
-        my_robot.orientation), duration.nanoseconds());
+  }
+
+  //PID制御を行う
+  //PID制御のための時間計測
+  auto current_time = steady_clock_.now();
+  auto duration = current_time - last_update_time_[robot_id];
+  if(position_pid[robot_id]){
+    if(!pre_position_pid){
+      pid_vx_[robot_id]->reset();
+      pid_vy_[robot_id]->reset(); 
+    }
+    world_vel.x = pid_vx_[robot_id]->computeCommand(next_goal_pose.x - my_robot.pos.x, duration.nanoseconds());
+    world_vel.y = pid_vy_[robot_id]->computeCommand(next_goal_pose.y - my_robot.pos.y, duration.nanoseconds());
+    world_vel.theta = pid_vtheta_[robot_id]->computeCommand(tools::normalize_theta(next_goal_pose.theta - my_robot.orientation), duration.nanoseconds());
+    // 最大加速度リミットを適用
+    //world_vel = limit_world_acceleration(world_vel, last_world_vel_[robot_id], duration);
+  }
+  else if(ball_wrap_pid[robot_id]){
+    if(!pre_ball_wrap_pid){
+      pid_wrap_radius_[robot_id]->reset();
+      pid_wrap_circumferential_[robot_id]->reset();
+    }
+    double radius_v = pid_wrap_radius_[robot_id]->computeCommand(radius_error, duration.nanoseconds());
+    double circumferential_v = pid_wrap_circumferential_[robot_id]->computeCommand(circumferential_error, duration.nanoseconds());
+    
+    double radius_accel = std::hypot(pre_radius_v[robot_id] - radius_v, 0)/duration.seconds();
+    double circumferential_accel = std::hypot(circumferential_v - pre_circumferential_v[robot_id], 0)/duration.seconds();
+    pre_radius_v[robot_id] = radius_v;
+    pre_circumferential_v[robot_id] = circumferential_v;
+
+    world_vel.x = radius_v*ob_unit_vec_radius_x + circumferential_v*ob_unit_vec_circumferential_x;
+    world_vel.y = radius_v*ob_unit_vec_radius_y + circumferential_v*ob_unit_vec_circumferential_y;
+    world_vel.theta = pid_vtheta_[robot_id]->computeCommand(tools::normalize_theta(next_goal_pose.theta - my_robot.orientation), duration.nanoseconds());
   }
 
   //RCLCPP_INFO(rclcpp::get_logger("rotate"),"theta : %lf", next_goal_pose.theta*RAD_TO_DEG);
   //RCLCPP_INFO(rclcpp::get_logger("dwa"),"x : %lf, y : %lf", world_vel.x, world_vel.y);
-
-  // 最大加速度リミットを適用
-  world_vel = limit_world_acceleration(world_vel, last_world_vel_[robot_id], duration);
   
   // 最大速度リミットを適用
   auto max_velocity_xy = max_velocity_xy_;
@@ -382,10 +459,15 @@ void Controller::on_timer_pub_control_command(const unsigned int robot_id)
   //角加速度のリミットを適用
   auto max_velocity_theta = max_velocity_theta_;
   //最大角速度リミットを上書き
-  max_velocity_theta = std::min((double) kick_con_max_velocity_theta, max_velocity_theta_);
+  //max_velocity_theta = std::min((double) kick_con_max_velocity_theta, max_velocity_theta_);
   //速度リミットを適用
   world_vel = limit_world_velocity(world_vel, max_velocity_xy, max_velocity_theta);
-  
+  //すべての目標値ベクトルが実数であることを確認する
+  if(!std::isfinite(world_vel.x) || !std::isfinite(world_vel.y) || !std::isfinite(world_vel.theta)){
+    world_vel.x = 0;
+    world_vel.y = 0;
+    world_vel.theta = 0;
+  }
   // ワールド座標系でのxy速度をロボット座標系に変換
   command_msg->velocity_x = std::cos(my_robot.orientation) * world_vel.x + std::sin(
     my_robot.orientation) * world_vel.y;
@@ -562,6 +644,7 @@ State Controller::limit_world_acceleration(
   if (acc_ratio > 1.0) {
     acc.x /= acc_ratio;
     acc.y /= acc_ratio;
+    RCLCPP_INFO(rclcpp::get_logger("accel"),"over accel %lf", acc_norm);
   }
   acc.theta = std::clamp(acc.theta, -max_acceleration_theta_, max_acceleration_theta_);
 
@@ -572,40 +655,52 @@ State Controller::limit_world_acceleration(
   return modified_velocity;
 }
 
-void Controller::decide_kick_xy(TrackedBall ball, State r_ball, State ball_goal, TrackedRobot my_robot, State &next_goal_pose, std::vector<bool> &ball_kick_con_flag,
-  const unsigned int robot_id, float &kick_con_max_velocity_theta, bool free_kick_flag, int32_t ball_target_allowable_error, bool ball_kick){
-  int32_t w_robot_x = my_robot.pos.x*1000;          //m->mm
-  int32_t w_robot_y = my_robot.pos.y*1000;          //m->mm
-  int32_t w_robot_theta = 1000 * RAD_TO_DEG * my_robot.orientation; // 0.001 deg
-  int32_t robot_omega = 1000 * RAD_TO_DEG * my_robot.vel_angular[0]; // 0.001 deg/s
-  int32_t w_ball_x = ball.pos.x * 1000;             //m->mm
-  int32_t w_ball_y = ball.pos.y * 1000;             //m->mm
-  int32_t w_ball_vx = ball.vel[0].x * 1000;       //m/s->mm/s
-  int32_t w_ball_vy = ball.vel[0].y * 1000;       //m/s->mm/s
-  int32_t r_ball_x = r_ball.x * 1000;             //m->mm
-  int32_t r_ball_y = r_ball.y * 1000;             //m->mm
-  int32_t target_ball_x = ball_goal.x*1000;         //m->mm
-  int32_t target_ball_y = ball_goal.y*1000;         //m->mm
-  int32_t robot_goal_x, robot_goal_y, robot_goal_theta; //mm
-  int32_t ball_kick_cin_max_velo_theta = kick_con_max_velocity_theta*RAD_TO_DEG*1000;     //1000 des/s (deg/sを1000倍した値, 初期値は最大値)
-  float ball_robot_distance = std::hypot(r_ball_x - ROBOT_KICK_MIN_X, r_ball_y);
+void Controller::robot_wrap_kick(State &next_goal_pose, TrackedBall ball, State r_ball, State ball_goal, TrackedRobot my_robot, double &circumferential_error,double &radius_error, double &goal_theta,
+    std::vector<bool> &ball_kick_con_flag, const unsigned int robot_id, float &kick_con_max_velocity_theta, bool free_kick_flag, int32_t ball_target_allowable_error, 
+    bool ball_kick, bool &ball_kick_con, float &ob_unit_vec_circumferential_x, float &ob_unit_vec_circumferential_y, float &ob_unit_vec_radius_x, float &ob_unit_vec_radius_y,
+    bool &wrap_kick_xy_flag, bool &dribble_active){
+  wrap_kick_robot wrap_robot;
+  wrap_kick_ball wrap_ball;
+  wrap_motion_pid pid;
+  wrap_robot.w_robot_x = my_robot.pos.x*1000;          //m->mm
+  wrap_robot.w_robot_y = my_robot.pos.y*1000;          //m->mm
+  wrap_robot.w_robot_theta = 1000 * RAD_TO_DEG * my_robot.orientation; // 0.001 deg
+  wrap_robot.w_robot_vx = my_robot.vel[0].x*1000;     //m/s->mm/s
+  wrap_robot.w_robot_vy = my_robot.vel[0].y*1000;     //m/s->mm/s
+  wrap_robot.w_robot_omega = 1000 * RAD_TO_DEG * my_robot.vel_angular[0]; // 0.001 deg/s
+  wrap_ball.w_ball_x = ball.pos.x * 1000;             //m->mm
+  wrap_ball.w_ball_y = ball.pos.y * 1000;             //m->mm
+  wrap_ball.w_ball_vx = ball.vel[0].x * 1000;       //m/s->mm/s
+  wrap_ball.w_ball_vy = ball.vel[0].y * 1000;       //m/s->mm/s
+  wrap_ball.r_ball_x = r_ball.x * 1000;             //m->mm
+  wrap_ball.r_ball_y = r_ball.y * 1000;             //m->mm
+  wrap_ball.target_ball_x = ball_goal.x*1000;         //m->mm
+  wrap_ball.target_ball_y = ball_goal.y*1000;         //m->mm
+  //int32_t cul_circumferential_error, cul_radius_error, robot_goal_theta; //mm
+  pid.ball_kick_cin_max_velo_theta = kick_con_max_velocity_theta*RAD_TO_DEG*1000;     //1000 des/s (deg/sを1000倍した値, 初期値は最大値)
+  float ball_robot_distance = std::hypot(wrap_ball.r_ball_x - ROBOT_KICK_MIN_X, wrap_ball.r_ball_y);
   //RCLCPP_INFO(rclcpp::get_logger("dwa"),"distance : %f", ball_robot_distance);
   if(WRAP_KICK_CONTROL_CHANGE_DISTANCE < ball_robot_distance){
     ball_kick_con_flag[robot_id] = 0;
   }else{
     ball_kick_con_flag[robot_id] = 1;
-    wrap_kick2(w_robot_x, w_robot_y, w_robot_theta, robot_omega, w_ball_x, w_ball_y, w_ball_vx, w_ball_vy, target_ball_x, target_ball_y, r_ball_x, r_ball_y,
-            &robot_goal_x, &robot_goal_y, &robot_goal_theta, &ball_kick_cin_max_velo_theta, free_kick_flag, ball_target_allowable_error, ball_kick);
+    wrap_kick2(wrap_robot, wrap_ball, &pid, free_kick_flag, ball_target_allowable_error, ball_kick, &ball_kick_con, &dribble_active);
+    ob_unit_vec_circumferential_x = pid.ob_unit_vec_circumferential_x;
+    ob_unit_vec_circumferential_y = pid.ob_unit_vec_circumferential_y;
+    ob_unit_vec_radius_x = pid.ob_unit_vec_radius_x;
+    ob_unit_vec_radius_y = pid.ob_unit_vec_radius_y;
+    circumferential_error = (double)pid.cul_circumferential_error/1000;   //単位変換(mm -> m)
+    radius_error = (double)pid.cul_radius_error/1000;                     //単位変換(mm -> m)
+    //RCLCPP_INFO(rclcpp::get_logger("kick"),"distance : %d", pid.cul_circumferential_error);
+    next_goal_pose.x = (double)pid.goal_x/1000;
+    next_goal_pose.y = (double)pid.goal_y/1000;
+    wrap_kick_xy_flag = pid.robot_xy_con_flag;
+    goal_theta = pid.robot_goal_theta/1000*DEG_TO_RAD;
   }
-  next_goal_pose.x = robot_goal_x;   
-  next_goal_pose.y = robot_goal_y;   
-  next_goal_pose.x = next_goal_pose.x/1000;   //単位変換(mm -> m)
-  next_goal_pose.y = next_goal_pose.y/1000;   //単位変換(mm -> m)
-  next_goal_pose.theta = robot_goal_theta/1000*DEG_TO_RAD;
-  kick_con_max_velocity_theta = ball_kick_cin_max_velo_theta/1000*DEG_TO_RAD;
   return;
 }
 
+/*
 bool Controller::decide_ball_kick(TrackedBall ball, State r_ball, State ball_goal, TrackedRobot my_robot, int32_t ball_target_allowable_error){
   bool ball_kick_flag = false;
   int32_t w_robot_theta = 1000 * RAD_TO_DEG * my_robot.orientation;
@@ -617,57 +712,64 @@ bool Controller::decide_ball_kick(TrackedBall ball, State r_ball, State ball_goa
   int32_t target_ball_y = ball_goal.y*1000;         //m->mm
   ball_kick_flag = ball_kick_check(w_robot_theta, w_ball_x, w_ball_y, target_ball_x, target_ball_y, r_ball_x, r_ball_y, ball_target_allowable_error);
   return ball_kick_flag;
-}
+}*/
 
-void Controller::decide_dribble_xy(State dribble_goal, TrackedBall ball, State r_ball, TrackedRobot my_robot, float &dribble_con_max_velocity_theta, State &next_goal_pose, 
-  std::vector<bool> &dribble_con_flag, const unsigned int robot_id, int32_t dribble_complete_distance, std::vector<micon_trape_con> &dribble_trape_c, 
-  std::vector<bool> &dribble_ball_move_flag){
+void Controller::dribble(State dribble_goal, TrackedBall ball, State r_ball, TrackedRobot my_robot, State &next_goal_pose, std::vector<bool> &dribble_con_flag, 
+    const unsigned int robot_id, int32_t dribble_complete_distance, std::vector<micon_trape_con> &dribble_trape_c, std::vector<bool> &dribble_ball_move_flag, 
+    double &circumferential_error,double &radius_error, float &ob_unit_vec_circumferential_x, float &ob_unit_vec_circumferential_y, float &ob_unit_vec_radius_x, 
+    float &ob_unit_vec_radius_y, bool &dribble_active){
   double ball_dribble_goal_distance = 1000 * std::hypot(dribble_goal.x - ball.pos.x, dribble_goal.y - ball.pos.y);
   double ball_robot_distance = std::hypot(1000 * r_ball.x - ROBOT_KICK_MIN_X, 1000 * r_ball.y);
   if(ball_dribble_goal_distance < dribble_complete_distance || ROBOT_DRIBBLE_DISTANCE < ball_robot_distance){
+    //RCLCPP_INFO(rclcpp::get_logger("dribble"),"dribble finish");
     dribble_con_flag[robot_id] = 0;
     dribble_ball_move_flag[robot_id] = 0;
     return;
   }
+  wrap_kick_robot drible_robot;
+  wrap_kick_ball dribble_ball;
+  wrap_motion_pid pid;
   dribble_con_flag[robot_id] = 1;
-  int32_t w_robot_x = my_robot.pos.x*1000;          //m->mm
-  int32_t w_robot_y = my_robot.pos.y*1000;          //m->mm
-  int32_t w_robot_theta = 1000 * RAD_TO_DEG * my_robot.orientation; // 0.001 deg
-  int32_t w_robot_vx = my_robot.vel[0].x*1000;      //m/s->mm/s
-  int32_t w_robot_vy = my_robot.vel[0].y*1000;      //m/s->mm/s
-  int32_t robot_omega = 1000 * RAD_TO_DEG * my_robot.vel_angular[0]; // 0.001 deg/s
-  int32_t w_ball_x = ball.pos.x * 1000;             //m->mm
-  int32_t w_ball_y = ball.pos.y * 1000;             //m->mm
-  int32_t w_ball_vx = ball.vel[0].x * 1000;       //m/s->mm/s
-  int32_t w_ball_vy = ball.vel[0].y * 1000;       //m/s->mm/s
-  int32_t r_ball_x = r_ball.x * 1000;             //m->mm
-  int32_t r_ball_y = r_ball.y * 1000;             //m->mm
-  int32_t dribble_goal_x = dribble_goal.x * 1000; //m->mm
-  int32_t dribble_goal_y = dribble_goal.y * 1000; //m->mm
-  int32_t dribble_goal_theta = dribble_goal.theta * 1000;  //0.001 deg
-  int32_t robot_goal_x, robot_goal_y, robot_goal_theta; //mm
-  int32_t ball_kick_cin_max_velo_theta = dribble_con_max_velocity_theta*RAD_TO_DEG*1000;     //1000 des/s (deg/sを1000倍した値, 初期値は最大値)
+  drible_robot.w_robot_x = my_robot.pos.x*1000;          //m->mm
+  drible_robot.w_robot_y = my_robot.pos.y*1000;          //m->mm
+  drible_robot.w_robot_theta = 1000 * RAD_TO_DEG * my_robot.orientation; // 0.001 deg
+  drible_robot.w_robot_vx = my_robot.vel[0].x*1000;      //m/s->mm/s
+  drible_robot.w_robot_vy = my_robot.vel[0].y*1000;      //m/s->mm/s
+  drible_robot.w_robot_omega = 1000 * RAD_TO_DEG * my_robot.vel_angular[0]; // 0.001 deg/s
+  dribble_ball.w_ball_x = ball.pos.x * 1000;             //m->mm
+  dribble_ball.w_ball_y = ball.pos.y * 1000;             //m->mm
+  dribble_ball.w_ball_vx = ball.vel[0].x * 1000;       //m/s->mm/s
+  dribble_ball.w_ball_vy = ball.vel[0].y * 1000;       //m/s->mm/s
+  dribble_ball.r_ball_x = r_ball.x * 1000;             //m->mm
+  dribble_ball.r_ball_y = r_ball.y * 1000;             //m->mm
+  dribble_ball.target_ball_x = dribble_goal.x * 1000; //m->mm
+  dribble_ball.target_ball_y = dribble_goal.y * 1000; //m->mm
   bool pre_dribble_ball_move_flag = dribble_ball_move_flag[robot_id];
-  dribble_ball_move_flag[robot_id] = dribble_wrap_motion(w_robot_x, w_robot_y, w_robot_theta, robot_omega, w_ball_x, w_ball_y, w_ball_vx, w_ball_vy, 
-                                      r_ball_x, r_ball_y, dribble_goal_x, dribble_goal_y, dribble_goal_theta, &robot_goal_x, &robot_goal_y, &robot_goal_theta, 
-                                      ball_kick_cin_max_velo_theta, dribble_ball_move_flag[robot_id]);
-  next_goal_pose.x = robot_goal_x;   
-  next_goal_pose.y = robot_goal_y;
+  dribble_ball_move_flag[robot_id] = dribble_wrap_motion(drible_robot, dribble_ball, &pid, dribble_complete_distance, dribble_ball_move_flag[robot_id], &dribble_active);
+  next_goal_pose.x = pid.goal_x/1000;   
+  next_goal_pose.y = pid.goal_y/1000;
+  ob_unit_vec_circumferential_x = pid.ob_unit_vec_circumferential_x;
+  ob_unit_vec_circumferential_y = pid.ob_unit_vec_circumferential_y;
+  ob_unit_vec_radius_x = pid.ob_unit_vec_radius_x;
+  ob_unit_vec_radius_y = pid.ob_unit_vec_radius_y;
+  circumferential_error = (double)pid.cul_circumferential_error/1000;   //単位変換(mm -> m)
+  radius_error = (double)pid.cul_radius_error/1000;                     //単位変換(mm -> m)
   if(dribble_ball_move_flag[robot_id]){
+    //RCLCPP_INFO(rclcpp::get_logger("dribble"),"trape con");
+    dribble_active = true;
     if(pre_dribble_ball_move_flag == 0){
-      micon_trapezoidal_DWA_change(w_robot_x, w_robot_y, w_robot_vx, w_robot_vy, &dribble_trape_c[robot_id], dribble_goal_x, dribble_goal_y, 
-                                    pre_dribble_ball_move_flag, 1, 0);
+      //RCLCPP_INFO(rclcpp::get_logger("dribble"),"trape con start");
+      micon_trapezoidal_DWA_change(drible_robot.w_robot_x, drible_robot.w_robot_y, drible_robot.w_robot_vx, drible_robot.w_robot_vy, &dribble_trape_c[robot_id], 
+        dribble_ball.target_ball_x, dribble_ball.target_ball_y, pre_dribble_ball_move_flag, 1, 0);
     }
     for(uint16_t i = 0; i < RASPI_TIME_STEP/MICON_TIME_STEP; i++){
-      micon_trapezoidal_dribble_control(dribble_goal_x, dribble_goal_y, &dribble_trape_c[robot_id], w_ball_x, w_ball_y);
-      robot_goal_theta = dribble_move_deg(r_ball_y, robot_goal_theta);
+      micon_trapezoidal_dribble_control(dribble_ball.target_ball_x, dribble_ball.target_ball_y, &dribble_trape_c[robot_id], dribble_ball.w_ball_x, dribble_ball.w_ball_y);
+      pid.robot_goal_theta = dribble_move_deg(dribble_ball.r_ball_y, pid.robot_goal_theta);
     }
-    next_goal_pose.x = dribble_trape_c[robot_id].virtual_x;
-    next_goal_pose.y = dribble_trape_c[robot_id].virtual_y;
+    next_goal_pose.x = dribble_trape_c[robot_id].virtual_x/1000;    //単位変換(mm -> m)
+    next_goal_pose.y = dribble_trape_c[robot_id].virtual_y/1000;    //単位変換(mm -> m)
   }   
-  next_goal_pose.x = next_goal_pose.x/1000;   //単位変換(mm -> m)
-  next_goal_pose.y = next_goal_pose.y/1000;   //単位変換(mm -> m)
-  next_goal_pose.theta = robot_goal_theta/1000*DEG_TO_RAD;
+  next_goal_pose.theta = pid.robot_goal_theta/1000*DEG_TO_RAD;
 }
 
 void Controller::decide_next_goal_xy(State goal_pose, State &midle_goal_pose, State &next_goal_pose, bool prohidited_zone_ignore, bool &midle_target_flag, 
