@@ -19,7 +19,7 @@ cd ~/ros2_ws/src
 
 ```
 git clone https://github.com/team-aisaac/AIsaac_strategy_for_ROS2_test.git
-git cline https://github.com/team-aisaac/robot_command_msgs_for_AIsaac_strategy_for_ROS2_test.git
+git clone https://github.com/team-aisaac/robot_command_msgs_for_AIsaac_strategy_for_ROS2_test.git
 ```
 
 
