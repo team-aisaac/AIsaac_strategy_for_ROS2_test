@@ -15,7 +15,7 @@ cd ~/ros2_ws/src
 ```
 [1]: https://docs.ros.org/en/foxy/Tutorials/Beginner-Client-Libraries/Creating-A-Workspace/Creating-A-Workspace.html
 
-2. ros_2ws/srcの中にソースコードを入れる。
+2. ros2_ws/srcの中にソースコードを入れる。
 
 ```
 git clone https://github.com/team-aisaac/AIsaac_strategy_for_ROS2_test.git
